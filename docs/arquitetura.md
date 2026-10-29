@@ -403,9 +403,8 @@ Fase 3, screenshots de cada tela em desktop e celular.
    gravação dos snapshots (inclusive os do demo, por classe e por corretora), recálculo
    pela API depois de cada escrita no ledger e processamento de `engine.dirty_ranges`
    pelo job.
-3. **Frontend:** tema de vidro, telas Início, Carteira, Lançamentos (com o lançamento
-   manual) e Admin, `/app` e `/demo`. Três opções de foto de fundo livres de direitos
-   para escolha.
+3. **Frontend:** em duas etapas. 3a (entregue): tema de vidro, componentes e Início no
+   `/demo`. 3b: Carteira, Lançamentos (com o lançamento manual), Admin e `/app` com login.
 4. **Importação:** importers (adaptador genérico + os das corretoras a partir dos
    exemplos), tela Importar, reconciliação entre origens, vitrine estática no `/demo`.
 5. **Assistente:** `nl_assistant`, tela Assistente com texto e voz, vitrine estática no
@@ -441,6 +440,32 @@ sem erro. Um passo de keepalive reativa o workflow pela API em toda execução.
 **Demo com ledger fictício e preço real:** tickers de verdade (PETR4, BTC) com uma
 carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
 
+## 6b. Frontend
+
+- **Tema num arquivo só:** `web/src/theme/tokens.ts` (cores, vidro, raios, sombras, movimento).
+  `applyTheme()` escreve tudo como variáveis CSS `--cauri-*`; `glass.css` só dá nome a elas
+  para o Tailwind e define o vidro. Trocar o visual é editar os tokens.
+- **Fundo:** foto do chalé ao entardecer ([Jonathan Borba, Pexels](https://www.pexels.com/photo/living-room-in-wooden-luxury-modern-hut-with-view-on-mountains-19737857/),
+  Pexels License, atribuição opcional, creditada no rodapé). AVIF e WebP em 1280, 1920 e
+  2560 px, mais um placeholder borrado de ~180 bytes embutido no código
+  (`scripts/optimize-bg.mjs`). Cada foto tem seu próprio véu no manifesto.
+- **Contraste AA medido, não estimado:** `e2e/contrast.spec.ts` mede a razão WCAG de todo
+  texto visível contra o fundo real atrás dele (foto, véu e vidro). Para passar no AA, o
+  briefing foi ajustado (aprovado em 29/10/2026): véu de 72% no topo e 62% na base para o
+  chalé (o céu claro fica no alto), vidro em 8% (o mínimo da faixa), textos secundários em
+  branco 78% e rótulos em 70% (o briefing previa 60% e 50%), selos de variação com fundo
+  escuro e iniciais escuras no avatar laranja.
+- **Trava no CI:** o job "Interface" roda o contraste e a checagem de "nenhuma rolagem
+  horizontal" no desktop e no celular, com o backend simulado pelas fixtures do demo
+  (`e2e/fixtures`, regravadas por `scripts/capture-fixtures.mjs`).
+- **Período padrão do Início:** "Tudo" no `/demo` (carteira de 12 meses) e "Ano" no `/app`.
+- **Linha "CDI" do gráfico:** o mesmo dinheiro, com as mesmas entradas e saídas nas mesmas
+  datas, rendendo 100% do CDI. Calculada pelo engine (`cdi_equivalent`), não no front.
+- **Demo só de leitura pelo tipo:** `DemoSource` não tem método de escrita; o cliente
+  Supabase do demo não guarda sessão nem manda JWT.
+- **Fonte:** Inter (algarismos tabulares de verdade). Bundle dividido por biblioteca, telas
+  carregadas sob demanda.
+
 ## 7. Decisões confirmadas
 
 | tema | decisão |
@@ -451,7 +476,7 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
 | ambiente local | `supabase start` com banco local |
 | cripto | CoinGecko Demo com atribuição no rodapé |
 | voz | Whisper via Groq atrás de interface; Web Speech API como fallback sem chave |
-| foto de fundo | 3 opções livres de direitos na Fase 3 |
+| foto de fundo | chalé ao entardecer (Pexels), escolhida entre 3 opções na Fase 3 |
 | template genérico | rascunho com as colunas abaixo; exemplos das corretoras na Fase 4 |
 | Importar e Assistente no /demo | vitrine estática, sem chamadas ao backend |
 | backfill | COTAHIST (B3) e Tesouro Transparente; brapi só no fechamento diário |
