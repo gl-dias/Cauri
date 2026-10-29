@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from cauri_importers.adapters.b3 import B3MovimentacaoAdapter, B3NegociacaoAdapter
 from cauri_importers.adapters.binance import (
     BinanceConvertAdapter,
+    BinanceP2PAdapter,
     BinanceSpotAdapter,
     BinanceSpotLegacyAdapter,
     BinanceStatementAdapter,
@@ -24,6 +25,7 @@ ADAPTERS: tuple[Adapter, ...] = (
     BinanceSpotAdapter(),
     BinanceSpotLegacyAdapter(),
     BinanceConvertAdapter(),
+    BinanceP2PAdapter(),
     BinanceTransfersAdapter(),
     BinanceStatementAdapter(),
     GenericAdapter(),

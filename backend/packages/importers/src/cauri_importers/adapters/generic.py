@@ -46,6 +46,8 @@ _COLUMNS: dict[str, tuple[str, ...]] = {
 }
 
 _TYPES = {t.value: t for t in MovementType}
+# Posição que já existia antes do histórico: entra como compra marcada, com o custo médio.
+OPENING_WORDS = frozenset({"saldo_inicial", "saldo inicial", "posicao inicial", "opening"})
 _CLASSES = {"acao": "acao", "acoes": "acao", "fii": "fii", "fiis": "fii", "tesouro": "tesouro"}
 _CLASSES |= {"renda_fixa": "renda_fixa", "renda fixa": "renda_fixa", "cripto": "cripto"}
 _INCOME = {k.value: k for k in IncomeKind}
@@ -81,9 +83,12 @@ class GenericAdapter:
 def _item(row: SheetRow) -> Item:
     c = row.cells
     type_text = normalize(cells.required_text(c.get("tipo"), "o tipo"))
-    movement_type = _TYPES.get(type_text)
+    opening = type_text in OPENING_WORDS
+    movement_type = MovementType.COMPRA if opening else _TYPES.get(type_text)
     if movement_type is None:
-        raise LineError(f"Tipo desconhecido: {type_text}. Use: {', '.join(_TYPES)}.")
+        raise LineError(
+            f"Tipo desconhecido: {type_text}. Use: {', '.join(_TYPES)} ou saldo_inicial."
+        )
     class_text = normalize(cells.required_text(c.get("classe"), "a classe"))
     asset_class = _CLASSES.get(class_text)
     if asset_class is None:
@@ -117,6 +122,7 @@ def _item(row: SheetRow) -> Item:
         factor=cells.optional_number(c.get("fator"), "fator"),
         income_kind=income_kind,
         notes=cells.text(c.get("obs")),
+        opening_balance=opening,
     )
 
 

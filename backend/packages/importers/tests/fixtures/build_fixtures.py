@@ -559,6 +559,86 @@ def build_crypto() -> None:
         ],
     )
 
+    # Caso do saldo que falta: USDT depositado de fora (sem histórico) e compra de TSTCOIN
+    # paga com esse USDT. E o P2P, a entrada mais comum de USDT no Brasil (compra com real).
+    write_csv(
+        HERE / "binance-deposito-usdt.csv",
+        ["Date(UTC)", "Coin", "Network", "Amount", "TXID", "Status"],
+        [["2011-03-01 10:00:00", "USDT", "TRX", "150", "0xficticio", "Completed"]],
+    )
+    write_csv(
+        HERE / "binance-trades-usdt.csv",
+        ["Date(UTC)", "Pair", "Side", "Price", "Executed", "Amount", "Fee"],
+        [
+            [
+                "2011-03-02 14:00:00",
+                "TSTCOINUSDT",
+                "BUY",
+                "200.00",
+                "0.50000000TSTCOIN",
+                "100.00000000USDT",
+                "0.10000000USDT",
+            ]
+        ],
+    )
+    write_csv(
+        HERE / "binance-p2p.csv",
+        [
+            "Order Number",
+            "Order Type",
+            "Asset Type",
+            "Fiat Type",
+            "Total Price",
+            "Price",
+            "Quantity",
+            "Exchange rate",
+            "Couterparty",
+            "Status",
+            "Created Time",
+        ],
+        [
+            [
+                "20110301000001",
+                "Buy",
+                "USDT",
+                "BRL",
+                "248.25",
+                "1.655",
+                "150",
+                "1.655",
+                "vendedor-ficticio",
+                "Completed",
+                "2011-03-01 12:00:00",
+            ],
+            [
+                "20110304000002",
+                "Sell",
+                "USDT",
+                "BRL",
+                "16.70",
+                "1.67",
+                "10",
+                "1.67",
+                "comprador-ficticio",
+                "Completed",
+                "2011-03-04 15:00:00",
+            ],
+            [
+                "20110304000003",
+                "Buy",
+                "USDT",
+                "BRL",
+                "50.00",
+                "1.66",
+                "30.12",
+                "1.66",
+                "outro-ficticio",
+                "Cancelled",
+                "2011-03-04 16:00:00",
+            ],
+        ],
+    )
+
     # Formato que nenhum adaptador conhece, para o mapeamento de colunas. Uma linha de
     # identificação inventada acima do cabeçalho não pode ser confundida com ele.
     write_csv(

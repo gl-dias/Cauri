@@ -54,6 +54,7 @@ def to_json(d: MovementDraft) -> dict[str, Any]:
         "fx_source": d.fx_source,
         "fee_asset": d.fee_asset,
         "fee_quantity": _num(d.fee_quantity),
+        "opening_balance": d.opening_balance,
     }
 
 
@@ -89,4 +90,5 @@ def from_json(data: Mapping[str, Any]) -> MovementDraft:
         fx_source=data.get("fx_source"),
         fee_asset=data.get("fee_asset"),
         fee_quantity=_dec(data.get("fee_quantity")),
+        opening_balance=bool(data.get("opening_balance")),
     )

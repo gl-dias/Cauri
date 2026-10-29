@@ -20,9 +20,11 @@ from cauri_importers.service import (
     ImportRejectedError,
     Preview,
     Upload,
+    add_opening_balance,
     commit,
     discard,
     preview,
+    recheck,
 )
 
 __all__ = [
@@ -34,7 +36,9 @@ __all__ = [
     "ImportRejectedError",
     "Preview",
     "Upload",
+    "add_opening_balance",
     "commit",
     "discard",
     "preview",
+    "recheck",
 ]

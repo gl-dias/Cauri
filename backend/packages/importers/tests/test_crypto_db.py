@@ -239,3 +239,91 @@ def test_perfil_nunca_guarda_cpf(user, as_user):
 
     with as_user(user) as conn, pytest.raises(psycopg.errors.CheckViolation):
         Ledger(conn).imports.save_profile(user.id, "X", {"data": "123.456.789-00"}, {})
+
+
+def test_deposito_externo_de_usdt_e_compra_sem_historico(user, as_user):
+    """O caso do saldo que falta: USDT depositado de fora, compra de TSTCOIN paga com esse
+    USDT e nenhum histórico anterior. A contrapartida em USDT fica descoberta; a prévia
+    sugere o saldo inicial na data do depósito, com a PTAX do dia como custo sugerido, e o
+    depósito avisa que explica o saldo. Incluir o saldo resolve sem reenviar os arquivos."""
+    files = [upload("binance-deposito-usdt.csv"), upload("binance-trades-usdt.csv")]
+    with as_user(user) as conn:
+        preview = importers.preview(Ledger(conn), user.id, files)
+        deposit_file, trades_file = preview.batch.files
+        buy, usdt_leg = trades_file.rows
+        assert buy.status == "ok"
+        assert usdt_leg.status == "error"
+        assert usdt_leg.messages[0]["code"] == "oversell"
+
+        [suggestion] = preview.batch.suggestions
+        assert suggestion["ticker"] == "USDT"
+        assert suggestion["trade_date"] == "2011-03-01"  # o dia do depósito
+        assert suggestion["quantity"] == "150"  # o depósito todo, não só o que faltou
+        assert suggestion["first_shortfall"] == "2011-03-02"
+        assert suggestion["unit_cost"] == "1.655"  # PTAX de venda de 01/03
+        assert "sugestão: PTAX de venda de 01/03/2011" in suggestion["cost_note"]
+        assert suggestion["deposit"] == {"quantity": "150", "day": "2011-03-01"}
+        [deposit] = deposit_file.rows
+        assert deposit.status == "ignored"
+        assert any("explica o saldo de USDT" in m["text"] for m in deposit.messages)
+
+        batch = importers.add_opening_balance(
+            Ledger(conn),
+            user.id,
+            preview.batch.id,
+            ticker="USDT",
+            trade_date=date(2011, 3, 1),
+            quantity=Decimal(150),
+            unit_cost=Decimal("1.60"),  # o custo que o usuário pagou, não a sugestão
+            broker_id="binance",
+        )
+        rows = {f.adapter: f.rows for f in batch.files}
+        assert [r.status for r in rows["binance-trades"]] == ["ok", "ok"]
+        assert [r.status for r in rows["saldo-inicial"]] == ["ok"]
+        assert batch.suggestions == ()
+        assert not any("explica" in m["text"] for m in rows["binance-transferencias"][0].messages)
+
+        importers.commit(Ledger(conn), user.id, batch.id, {})
+        saved = conn.execute(
+            "select a.ticker, m.type, m.quantity, m.unit_price, m.opening_balance, m.origin_label"
+            " from ledger.movements m join market.assets a on a.id = m.asset_id"
+            " where m.user_id = %s order by m.trade_date, m.opening_balance desc, a.ticker",
+            [user.id],
+        ).fetchall()
+        opening_row = saved[0]
+        assert (opening_row["ticker"], opening_row["quantity"]) == ("USDT", Decimal(150))
+        assert opening_row["opening_balance"] is True
+        assert opening_row["origin_label"] == "Saldo inicial"
+        assert opening_row["unit_price"] == Decimal("1.60")
+        usdt = sum(
+            r["quantity"] if r["type"] == "compra" else -r["quantity"]
+            for r in saved
+            if r["ticker"] == "USDT"
+        )
+        assert usdt == Decimal("49.9")  # 150 - 100 - 0,1 de taxa
+
+    with as_user(user) as conn:
+        again = importers.preview(Ledger(conn), user.id, files)
+        assert again.batch.suggestions == ()
+        assert {r.status for f in again.batch.files for r in f.rows} == {
+            "ignored",
+            "already_imported",
+        }
+
+
+def test_venda_descoberta_sem_deposito_sugere_a_vespera(user, as_user):
+    with as_user(user) as conn:
+        preview = importers.preview(Ledger(conn), user.id, [upload("binance-trades-usdt.csv")])
+        [suggestion] = preview.batch.suggestions
+        assert suggestion["trade_date"] == "2011-03-01"  # véspera da compra de 02/03
+        assert suggestion["quantity"] == "100.1"  # o que faltou, com a taxa
+        assert suggestion["deposit"] is None
+
+
+def test_p2p_e_a_entrada_de_usdt_que_cobre_a_compra(user, as_user):
+    files = [upload("binance-p2p.csv"), upload("binance-trades-usdt.csv")]
+    with as_user(user) as conn:
+        preview = importers.preview(Ledger(conn), user.id, files)
+        statuses = [r.status for f in preview.batch.files for r in f.rows]
+        assert statuses == ["ok", "ok", "ignored", "ok", "ok"]
+        assert preview.batch.suggestions == ()

@@ -25,7 +25,7 @@ from uuid import UUID, uuid4
 from cauri_core import CORPORATE_EVENTS, Movement, MovementType, Origin
 from cauri_engine.calc import replay
 from cauri_importers import brokers as broker_names
-from cauri_importers import drafts, fx, registry
+from cauri_importers import drafts, fx, opening, registry
 from cauri_importers.adapters.mapped import MappedAdapter
 from cauri_importers.model import (
     Adapter,
@@ -34,6 +34,7 @@ from cauri_importers.model import (
     PrivateFixedIncome,
     TesouroTitle,
     Ticker,
+    Transfer,
 )
 from cauri_importers.privacy import normalize
 from cauri_importers.table import FileError, UnknownFormatError, read
@@ -44,12 +45,15 @@ from cauri_ledger import (
     Ledger,
     LedgerValidationError,
     MovementDraft,
+    RowStatus,
     StagedFile,
     StagedRow,
     StoredBatch,
+    StoredRow,
 )
 
 MAX_FILES = 10
+OPENING_ADAPTER = "saldo-inicial"
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +127,7 @@ class _Row:
     ignored: str | None = None
     check: DraftCheck | None = None
     notes: list[str] = field(default_factory=list)
+    hints: list[str] = field(default_factory=list)  # avisos que dependem do envio todo
 
 
 def preview(ledger: Ledger, user_id: UUID, uploads: Sequence[Upload]) -> Preview:
@@ -156,10 +161,25 @@ def preview(ledger: Ledger, user_id: UUID, uploads: Sequence[Upload]) -> Preview
     for row, check in zip(importable, checks, strict=True):
         row.check = check
 
+    deposits = [
+        opening.Deposit(t.coin, t.quantity, t.day)
+        for r in rows
+        if (t := r.line.transfer) is not None and t.kind == "deposito"
+    ]
+    suggestions = opening.suggest(
+        ledger, user_id, [(r.draft, r.check) for r in importable if r.draft and r.check], deposits
+    )
+    for row in rows:
+        t = row.line.transfer
+        hint = _deposit_hint(t.coin, t.day, suggestions) if t and t.kind == "deposito" else None
+        if hint:
+            row.hints.append(hint)
+
     for f in files:
         f.label = _file_label(f)
     store = ledger.imports
     batch_id = store.create_batch(user_id, registry.batch_warnings([f.adapter.name for f in files]))
+    store.set_suggestions(user_id, batch_id, [x.to_json() for x in suggestions])
     for f in files:
         file_id = store.add_file(
             user_id,
@@ -295,6 +315,7 @@ def _resolve(ledger: Ledger, user_id: UUID, rows: list[_Row]) -> None:
             fx_source=rate.source if rate else None,
             fee_asset=conv.fee_asset,
             fee_quantity=conv.fee_quantity,
+            opening_balance=item.opening_balance,
         )
     _derive_factors(ledger, user_id, rows)
 
@@ -325,6 +346,7 @@ def _content(family: str, item: Item, broker_id: str, ticker: str | None) -> tup
         item.fee_asset or "",
         num(item.fee_quantity),
         f"{item.fee_paid[0]}:{num(item.fee_paid[1])}" if item.fee_paid else "",
+        "saldo-inicial" if item.opening_balance else "",
     )
 
 
@@ -449,16 +471,22 @@ def _mark_repeated(rows: list[_Row]) -> None:
 def _staged(position: int, row: _Row) -> StagedRow:
     raw = dict(row.line.raw)
     numbers = row.line.numbers
-    info = [{"level": "info", "text": n} for n in row.notes]
+    notes = tuple({"level": "info", "text": n} for n in row.notes)
+    hints = tuple({"level": "warning", "text": h, "hint": True} for h in row.hints)
+    transfer = _transfer_json(row.line.transfer)
+    draft_json = drafts.to_json(row.draft) if row.draft else None
+    key = row.draft.idempotency_key if row.draft else None
     if row.error:
         return StagedRow(
             position,
             numbers,
             raw,
             "error",
-            draft=drafts.to_json(row.draft) if row.draft else None,
-            idempotency_key=row.draft.idempotency_key if row.draft else None,
-            messages=({"level": "error", "text": row.error}, *info),
+            draft=draft_json,
+            idempotency_key=key,
+            # Erro local (leitura, cadastro, repetida no envio): a reconferência não mexe.
+            messages=({"level": "error", "text": row.error, "local": True}, *notes),
+            transfer=transfer,
         )
     if row.ignored or row.draft is None:
         return StagedRow(
@@ -466,60 +494,210 @@ def _staged(position: int, row: _Row) -> StagedRow:
             numbers,
             raw,
             "ignored",
-            messages=({"level": "info", "text": row.ignored or "Ignorada."},),
+            messages=({"level": "info", "text": row.ignored or "Ignorada."}, *hints, *notes),
+            transfer=transfer,
         )
-    check = row.check
-    assert check is not None
-    draft_json = drafts.to_json(row.draft)
-    key = row.draft.idempotency_key
-    if check.errors:
-        return StagedRow(
-            position,
-            numbers,
-            raw,
-            "error",
-            draft=draft_json,
-            idempotency_key=key,
-            messages=(*({"level": "error", "text": e.message} for e in check.errors), *info),
-        )
-    if check.already_posted is not None:
-        return StagedRow(
-            position,
-            numbers,
-            raw,
-            "already_imported",
-            draft=draft_json,
-            idempotency_key=key,
-            messages=({"level": "info", "text": "Já importada antes."},),
-            match_movement_ids=(check.already_posted,),
-        )
-    if check.duplicates:
-        texts = [
-            f"Parece a mesma operação já lançada por {dup.origin_label or dup.origin.value} "
-            f"em {dup.trade_date:%d/%m/%Y}."
-            for dup in check.duplicates
-        ]
-        return StagedRow(
-            position,
-            numbers,
-            raw,
-            "possible_duplicate",
-            draft=draft_json,
-            idempotency_key=key,
-            messages=(*({"level": "warning", "text": t} for t in texts), *info),
-            match_movement_ids=tuple(dup.movement_id for dup in check.duplicates),
-            decision="keep_existing",
-        )
+    assert row.check is not None
+    status, messages, matches, decision = _verdict(row.check)
     return StagedRow(
         position,
         numbers,
         raw,
-        "ok",
+        status,
         draft=draft_json,
         idempotency_key=key,
-        messages=tuple(info),
-        decision="import",
+        messages=(*messages, *notes),
+        match_movement_ids=matches,
+        decision=decision,
+        transfer=transfer,
     )
+
+
+def _verdict(
+    check: DraftCheck,
+) -> tuple[RowStatus, tuple[dict[str, Any], ...], tuple[UUID, ...], Decision | None]:
+    """Status, mensagens, duplicados e decisão padrão de uma linha conferida no ledger.
+
+    As mensagens daqui levam ``check``: a reconferência troca só elas e mantém as notas.
+    """
+    if check.errors:
+        return (
+            "error",
+            tuple(
+                {"level": "error", "text": e.message, "code": e.code.value, "check": True}
+                for e in check.errors
+            ),
+            (),
+            None,
+        )
+    if check.already_posted is not None:
+        return (
+            "already_imported",
+            ({"level": "info", "text": "Já importada antes.", "check": True},),
+            (check.already_posted,),
+            None,
+        )
+    if check.duplicates:
+        return (
+            "possible_duplicate",
+            tuple(
+                {
+                    "level": "warning",
+                    "text": f"Parece a mesma operação já lançada por "
+                    f"{dup.origin_label or dup.origin.value} em {dup.trade_date:%d/%m/%Y}.",
+                    "check": True,
+                }
+                for dup in check.duplicates
+            ),
+            tuple(dup.movement_id for dup in check.duplicates),
+            "keep_existing",
+        )
+    return "ok", (), (), "import"
+
+
+def _transfer_json(t: Transfer | None) -> dict[str, str] | None:
+    if t is None:
+        return None
+    return {"kind": t.kind, "coin": t.coin, "quantity": str(t.quantity), "day": t.day.isoformat()}
+
+
+def _deposit_hint(coin: str, day: date, suggestions: Sequence[opening.Suggestion]) -> str | None:
+    for x in suggestions:
+        if x.deposit is not None and x.deposit.coin == coin and x.deposit.day == day:
+            return (
+                f"Este depósito explica o saldo de {coin} que falta para as vendas a partir de "
+                f"{x.first_shortfall:%d/%m/%Y}: veio de fora, então inclua um saldo inicial."
+            )
+    return None
+
+
+# Saldo inicial e reconferência -------------------------------------------------------
+
+
+def add_opening_balance(
+    ledger: Ledger,
+    user_id: UUID,
+    batch_id: UUID,
+    *,
+    ticker: str,
+    trade_date: date,
+    quantity: Decimal,
+    unit_cost: Decimal,
+    broker_id: str,
+) -> StoredBatch:
+    """Inclui no lote um saldo inicial (entra junto com o resto, ao confirmar) e confere
+    tudo de novo, sem precisar dos arquivos."""
+    store = ledger.imports
+    batch = _open_batch(store.batch(user_id, batch_id))
+    if quantity <= 0 or unit_cost < 0:
+        raise ImportRejectedError("Informe quantidade maior que zero e custo médio.")
+    d = opening.draft(
+        ticker=ticker.strip().upper(),
+        trade_date=trade_date,
+        quantity=quantity,
+        unit_cost=unit_cost,
+        broker_id=broker_id,
+    )
+    file = next((f for f in batch.files if f.adapter == OPENING_ADAPTER), None)
+    file_id = (
+        file.id
+        if file is not None
+        else store.add_file(
+            user_id,
+            batch_id,
+            StagedFile(
+                "Saldos iniciais",
+                hashlib.sha256(str(batch_id).encode()).hexdigest(),
+                1,
+                OPENING_ADAPTER,
+                1,
+            ),
+        )
+    )
+    position = len(file.rows) if file is not None else 0
+    store.add_rows(
+        user_id,
+        file_id,
+        [
+            StagedRow(
+                position,
+                (position + 1,),
+                {
+                    "ativo": d.ticker or "",
+                    "data": f"{trade_date:%d/%m/%Y}",
+                    "quantidade": str(quantity),
+                    "custo_medio": str(unit_cost),
+                },
+                "ok",
+                draft=drafts.to_json(d),
+                idempotency_key=d.idempotency_key,
+                messages=(
+                    {
+                        "level": "info",
+                        "text": "Saldo inicial: posição anterior ao histórico, com o custo "
+                        "médio informado. Entra junto com o resto da importação.",
+                    },
+                ),
+                decision="import",
+            )
+        ],
+    )
+    return recheck(ledger, user_id, batch_id)
+
+
+def recheck(ledger: Ledger, user_id: UUID, batch_id: UUID) -> StoredBatch:
+    """Confere de novo as linhas guardadas do lote (depois de incluir um saldo inicial)."""
+    store = ledger.imports
+    batch = _open_batch(store.batch(user_id, batch_id))
+    rows = [r for f in batch.files for r in f.rows]
+    candidates = [
+        r
+        for r in rows
+        if r.draft is not None
+        and r.status != "ignored"
+        and not any(m.get("local") for m in r.messages)
+    ]
+    loaded = [drafts.from_json(r.draft) for r in candidates if r.draft is not None]
+    checks = ledger.check(
+        user_id, loaded, origin=Origin.IMPORT, by_source=True, duplicates_neutral=True
+    )
+    deposits = opening.deposits_of([r.transfer for r in rows])
+    suggestions = opening.suggest(ledger, user_id, list(zip(loaded, checks, strict=True)), deposits)
+
+    updated: list[StoredRow] = []
+    for row, check in zip(candidates, checks, strict=True):
+        status, messages, matches, decision = _verdict(check)
+        notes = [m for m in row.messages if not m.get("check")]
+        updated.append(
+            replace(
+                row,
+                status=status,
+                messages=(*messages, *notes),
+                match_movement_ids=matches,
+                decision=decision,
+            )
+        )
+    for row in rows:
+        t = row.transfer
+        if row.status != "ignored" or not t or t.get("kind") != "deposito":
+            continue
+        kept = [m for m in row.messages if not m.get("hint")]
+        hint = _deposit_hint(t["coin"], date.fromisoformat(t["day"]), suggestions)
+        hints = [{"level": "warning", "text": hint, "hint": True}] if hint else []
+        updated.append(replace(row, messages=(kept[0], *hints, *kept[1:])))
+    store.update_rows(user_id, updated)
+    store.set_suggestions(user_id, batch_id, [x.to_json() for x in suggestions])
+    result = store.batch(user_id, batch_id)
+    assert result is not None
+    return result
+
+
+def _open_batch(batch: StoredBatch | None) -> StoredBatch:
+    if batch is None:
+        raise BatchNotFoundError("Importação não encontrada.")
+    if batch.status != "preview":
+        raise BatchClosedError("Esta importação já foi gravada ou descartada.")
+    return batch
 
 
 # Gravação ------------------------------------------------------------------------------

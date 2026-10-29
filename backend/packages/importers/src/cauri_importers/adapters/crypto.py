@@ -250,6 +250,39 @@ SELL_WORDS = frozenset({"venda", "v", "sell", "sale"})
 REWARD_WORDS = frozenset(
     {"recompensa", "reward", "rewards", "staking", "earn", "rendimento cripto", "interest"}
 )
+OPENING_WORDS = frozenset({"saldo inicial", "saldo_inicial", "posicao inicial", "opening"})
+
+
+def opening_line(
+    numbers: tuple[int, ...],
+    raw: Mapping[str, str],
+    *,
+    day: date,
+    coin: str,
+    quantity: Decimal,
+    unit_cost: Decimal,
+    currency: str,
+    broker: str,
+) -> Line:
+    """Saldo que já existia antes do histórico: compra marcada, com o custo médio informado.
+    Não gera contrapartida (não foi pago com nada que esteja no Cauri)."""
+    if quantity <= 0:
+        raise LineError("Saldo inicial com quantidade zerada.")
+    return Line(
+        numbers=numbers,
+        raw=raw,
+        notes=("Saldo inicial: posição anterior ao histórico, com o custo médio informado.",),
+        item=Item(
+            trade_date=day,
+            type=MovementType.COMPRA,
+            asset=Ticker(coin),
+            broker=broker,
+            quantity=quantity,
+            unit_price=unit_cost,
+            currency=currency,
+            opening_balance=True,
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -285,8 +318,23 @@ def _template_row(row: SheetRow, numbers: tuple[int, ...], raw: dict[str, str]) 
         return reward_lines(
             numbers, raw, day=day, coin=coin, quantity=quantity, broker=broker, kind="Recompensa"
         )
+    if kind in OPENING_WORDS:
+        return [
+            opening_line(
+                numbers,
+                raw,
+                day=day,
+                coin=coin,
+                quantity=quantity,
+                unit_cost=cells.number(c.get("preco"), "preco (custo médio)"),
+                currency=(cells.text(c.get("moeda")) or "BRL").upper(),
+                broker=broker,
+            )
+        ]
     if kind not in BUY_WORDS | SELL_WORDS:
-        raise LineError(f"Tipo desconhecido: {kind}. Use compra, venda ou recompensa.")
+        raise LineError(
+            f"Tipo desconhecido: {kind}. Use compra, venda, recompensa ou saldo inicial."
+        )
     currency = (cells.text(c.get("moeda")) or "BRL").upper()
     return trade_lines(
         numbers,

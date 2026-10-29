@@ -67,6 +67,18 @@ class Item:
     # Taxa como foi paga, quando já está em fees pela cotação (0,0005 BTC numa compra de BTC
     # em USDT entra em fees como 0,1 USDT). Só para registro no movimento.
     fee_paid: tuple[str, Decimal] | None = None
+    # Compra marcada como saldo inicial (posição anterior ao histórico, custo informado).
+    opening_balance: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class Transfer:
+    """Depósito ou saque lido do arquivo. Não mexe na posição, mas explica saldo que falta."""
+
+    kind: str  # "deposito" | "saque"
+    coin: str
+    quantity: Decimal
+    day: date
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +91,7 @@ class Line:
     ignored: str | None = None  # motivo, quando a linha não vira movimentação
     error: str | None = None
     notes: tuple[str, ...] = ()  # observações que vão junto na pré-visualização
+    transfer: Transfer | None = None
 
 
 @dataclass(frozen=True, slots=True)

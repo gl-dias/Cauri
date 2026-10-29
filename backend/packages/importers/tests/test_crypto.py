@@ -122,7 +122,7 @@ class TestBinanceOutros:
         assert legs(lines, 3)[0].ignored.startswith("Compra, venda ou taxa")
         assert "dinheiro em conta" in legs(lines, 4)[0].ignored
         assert "carteiras da própria Binance" in legs(lines, 5)[0].ignored
-        assert "P2P" in legs(lines, 6)[0].error
+        assert "export de P2P" in legs(lines, 6)[0].ignored
         assert "não reconhecida: Mystery Box" in legs(lines, 7)[0].error
 
     def test_extrato_nunca_le_id_de_usuario_nem_observacao(self):
@@ -264,3 +264,39 @@ class TestConversao:
             fx.convert(self.item(currency="USDT"), book)
         with pytest.raises(fx.ConversionError, match="Sem fechamento"):
             fx.convert(self.item(currency="TSTFEE"), book)
+
+
+class TestP2PeDepositos:
+    def test_p2p_vira_compra_e_venda_com_real_sem_contrapartida(self):
+        adapter, lines = parse("binance-p2p.csv")
+        assert adapter.name == "binance-p2p"
+        buy, sell, cancelled = lines
+        assert buy.item.type is MovementType.COMPRA
+        assert (buy.item.asset, buy.item.quantity) == (Ticker("USDT"), Decimal("150"))
+        assert (buy.item.unit_price, buy.item.currency) == (Decimal("1.655"), "BRL")
+        assert sell.item.type is MovementType.VENDA
+        assert cancelled.ignored == "Ordem P2P não concluída."
+        for line in lines:
+            assert "ficticio" not in str(line.raw)  # apelido da contraparte nunca é lido
+            assert "20110301000001" not in str(line.raw)  # nem o número da ordem
+
+    def test_deposito_de_cripto_leva_moeda_quantidade_e_dia(self):
+        _, lines = parse("binance-deposito-usdt.csv")
+        [deposit] = lines
+        assert deposit.item is None
+        assert deposit.transfer.kind == "deposito"
+        assert (deposit.transfer.coin, deposit.transfer.quantity) == ("USDT", Decimal("150"))
+        assert deposit.transfer.day == date(2011, 3, 1)
+        _, fiat = parse("binance-depositos.csv")
+        assert fiat[0].transfer is None  # depósito em real não explica saldo de cripto
+
+    def test_saldo_inicial_nos_templates(self):
+        detected = read(
+            "x.csv",
+            b"data;tipo;ativo;classe;quantidade;preco;corretora\n"
+            b"01/01/2026;saldo_inicial;TSTA3;acao;100;18,50;Corretora Teste A\n",
+            registry.ADAPTERS,
+        )
+        [line] = detected.adapter.parse(detected.rows)
+        assert line.item.type is MovementType.COMPRA
+        assert line.item.opening_balance

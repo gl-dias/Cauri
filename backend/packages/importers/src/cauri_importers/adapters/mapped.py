@@ -17,8 +17,10 @@ from cauri_core import IncomeKind, MovementType
 from cauri_importers import cells
 from cauri_importers.adapters.crypto import (
     BUY_WORDS,
+    OPENING_WORDS,
     REWARD_WORDS,
     SELL_WORDS,
+    opening_line,
     reward_lines,
     trade_lines,
 )
@@ -120,6 +122,20 @@ def _row(
             numbers, raw, day=day, coin=ticker_text.upper(), quantity=quantity,
             broker=broker, kind="Recompensa",
         )  # fmt: skip
+    if kind in OPENING_WORDS:
+        if quantity is None:
+            raise LineError("Saldo inicial precisa da quantidade.")
+        cost = cells.optional_number(c.get("preco"), "preco", decimal)
+        if cost is None and value is not None:
+            cost = value / quantity
+        if cost is None:
+            raise LineError("Saldo inicial precisa do custo médio (preço) ou do valor total.")
+        return [
+            opening_line(
+                numbers, raw, day=day, coin=ticker_text.upper(), quantity=quantity,
+                unit_cost=cost, currency=currency, broker=broker,
+            )
+        ]  # fmt: skip
     if kind in _INCOME_WORDS:
         if value is None:
             raise LineError("Provento precisa do valor.")

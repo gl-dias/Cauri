@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from cauri_importers import cells
 from cauri_importers.adapters.crypto import NOT_POSITIONS, convert_lines, reward_lines, trade_lines
 from cauri_importers.cells import LineError
-from cauri_importers.model import Cell, Line, SheetRow
+from cauri_importers.model import Cell, Line, SheetRow, Transfer
 from cauri_importers.privacy import normalize
 from cauri_importers.table import as_text
 
@@ -239,7 +239,26 @@ def _transfer(row: SheetRow, raw: dict[str, str]) -> list[Line]:
     coin = cells.required_text(c.get("moeda"), "Coin").upper()
     # O histórico de saques tem a coluna de taxa; o de depósitos, não.
     kind = "Saque" if "taxa" in c else "Depósito"
-    return [Line(numbers=(row.number,), raw=raw, ignored=transfer_reason(kind, coin))]
+    return [
+        Line(
+            numbers=(row.number,),
+            raw=raw,
+            ignored=transfer_reason(kind, coin),
+            transfer=_transfer_info(kind, coin, c.get("quantidade"), c.get("data")),
+        )
+    ]
+
+
+def _transfer_info(kind: str, coin: str, amount: Cell, when: Cell) -> Transfer | None:
+    """Depósito ou saque de cripto, para explicar saldo que falta. Real não interessa."""
+    if coin in NOT_POSITIONS:
+        return None
+    try:
+        quantity = abs(cells.number(amount, "Amount", "."))
+        day = cells.utc_day(when)
+    except LineError:
+        return None
+    return Transfer("deposito" if kind == "Depósito" else "saque", coin, quantity, day)
 
 
 def transfer_reason(kind: str, coin: str) -> str:
@@ -279,6 +298,7 @@ _STATEMENT_IGNORED: dict[str, str] = {
             "large otc trading",
         )
     },
+    "p2p trading": "Compra ou venda P2P: vem do export de P2P (ordens com reais).",
     "small assets exchange bnb": (
         "Conversão de saldos pequenos em BNB: valores mínimos, fica de fora."
     ),
@@ -287,7 +307,6 @@ _STATEMENT_IGNORED: dict[str, str] = {
 }
 _INTERNAL = ("subscription", "redemption", "transfer", "purchase")
 _MANUAL: dict[str, str] = {
-    "p2p trading": "P2P: lance manualmente a compra ou venda (não vem no export de trades).",
     "auto-invest transaction": "Auto-Invest: lance manualmente as compras do plano.",
 }
 
@@ -326,7 +345,14 @@ def _statement(row: SheetRow, raw: dict[str, str]) -> list[Line]:
     if operation in {"deposit", "withdraw"}:
         kind = "Depósito" if operation == "deposit" else "Saque"
         coin = cells.required_text(c.get("moeda"), "Coin").upper()
-        return [Line(numbers=numbers, raw=raw, ignored=transfer_reason(kind, coin))]
+        return [
+            Line(
+                numbers=numbers,
+                raw=raw,
+                ignored=transfer_reason(kind, coin),
+                transfer=_transfer_info(kind, coin, c.get("variacao"), c.get("data")),
+            )
+        ]
     if operation in _MANUAL:
         raise LineError(_MANUAL[operation])
     if is_reward(operation):
@@ -351,3 +377,53 @@ def _statement(row: SheetRow, raw: dict[str, str]) -> list[Line]:
             )
         ]
     raise LineError(f"Operação da Binance ainda não reconhecida: {label}.")
+
+
+# P2P (ordens de compra e venda de cripto com reais) ---------------------------------
+
+_P2P: dict[str, tuple[str, ...]] = {
+    "lado": ("order type", "type"),
+    "moeda": ("asset type", "asset"),
+    "fiat": ("fiat type", "fiat"),
+    "total": ("total price", "total"),
+    "preco": ("price", "unit price"),
+    "quantidade": ("quantity", "amount"),
+    "status": ("status",),
+    "data": ("created time", "create time", "time", "date(utc)"),
+}
+
+
+@dataclass(frozen=True)
+class BinanceP2PAdapter:
+    """Histórico de ordens P2P: a porta de entrada mais comum de cripto no Brasil (comprar
+    USDT com real por PIX). O apelido da contraparte e o número da ordem nunca são lidos."""
+
+    name: str = "binance-p2p"
+    family: str = "binance"
+    label: str = "Binance"
+    title: str = "Binance · P2P"
+    version: int = 1
+    columns: Mapping[str, tuple[str, ...]] = field(default_factory=lambda: _P2P)
+    required: frozenset[str] = frozenset({"lado", "moeda", "fiat", "quantidade", "status", "data"})
+
+    def parse(self, rows: list[SheetRow]) -> list[Line]:
+        return _each(rows, _p2p)
+
+
+def _p2p(row: SheetRow, raw: dict[str, str]) -> list[Line]:
+    c = row.cells
+    status = normalize(cells.text(c.get("status")) or "")
+    if status not in {"completed", "complete", "concluido", "concluida"}:
+        return [Line(numbers=(row.number,), raw=raw, ignored="Ordem P2P não concluída.")]
+    return trade_lines(
+        (row.number,),
+        raw,
+        day=cells.utc_day(c.get("data"), "Created Time"),
+        buy=_side(c.get("lado")),
+        base=cells.required_text(c.get("moeda"), "Asset Type").upper(),
+        quote=cells.required_text(c.get("fiat"), "Fiat Type").upper(),
+        quantity=cells.number(c.get("quantidade"), "Quantity", "."),
+        price=cells.optional_number(c.get("preco"), "Price", "."),
+        total=cells.optional_number(c.get("total"), "Total Price", "."),
+        broker=BROKER,
+    )
