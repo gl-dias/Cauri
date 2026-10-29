@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(57);
+select plan(60);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -80,6 +80,9 @@ insert into assistant.messages (id, conversation_id, user_id, role, content) val
    '00000000-0000-4000-8000-00000000000a', 'user', 'comprei 3 petrobras');
 insert into assistant.proposals (message_id, user_id) values
   ('30000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a');
+insert into ops.llm_usage (user_id, provider, kind, model, input_tokens, output_tokens, ok) values
+  ('00000000-0000-4000-8000-00000000000a', 'anthropic', 'mensagem', 'claude-haiku-5-5', 800, 90, true),
+  ('00000000-0000-4000-8000-00000000000b', 'anthropic', 'mensagem', 'claude-haiku-5-5', 700, 80, true);
 insert into imports.profiles (user_id, name, mapping, options)
 values ('00000000-0000-4000-8000-00000000000a', 'Corretora da Ana',
         '{"data": "Data", "tipo": "Operação", "ativo": "Papel"}', '{"broker_id": "corretora-a"}');
@@ -105,6 +108,7 @@ select is((select count(*)::int from imports.rows), 1, 'ana vê as linhas da pr�
 select throws_ok($$delete from imports.batches$$, '42501', null,
   'ninguém apaga lote de importação (descartar é mudar o status)');
 select is((select count(*)::int from imports.profiles), 1, 'ana vê o próprio perfil de importação');
+select ok((select count(distinct user_id) from ops.llm_usage) >= 2, 'admin vê o uso do assistente de todos');
 select is((select count(*)::int from assistant.messages) + (select count(*)::int from assistant.proposals), 2,
   'ana vê a própria conversa com o assistente');
 select throws_ok($$delete from assistant.messages$$, '42501', null, 'ninguém apaga mensagem do assistente');
@@ -142,6 +146,12 @@ select throws_ok(
   $$insert into imports.batches (user_id) values ('00000000-0000-4000-8000-00000000000a')$$,
   '42501', null, 'bruno não cria lote de importação em nome da ana');
 select is((select count(*)::int from imports.profiles), 0, 'bruno não vê o perfil da ana');
+select is((select count(*)::int from ops.llm_usage where user_id <> auth.uid()), 0,
+  'usuário comum só vê o próprio uso do assistente');
+select throws_ok(
+  $$insert into ops.llm_usage (user_id, provider, kind, model, ok)
+    values ('00000000-0000-4000-8000-00000000000a', 'anthropic', 'mensagem', 'x', true)$$,
+  '42501', null, 'bruno não registra uso em nome da ana');
 select is((select count(*)::int from assistant.conversations) + (select count(*)::int from assistant.proposals), 0,
   'bruno não vê a conversa da ana com o assistente');
 select throws_ok(
