@@ -187,6 +187,8 @@ ledger.movements (
   quantity numeric(28,10), unit_price numeric(28,10), fees, amount, factor,
   broker_id, origin 'import'|'manual'|'chat', origin_ref uuid, origin_label,  -- 'Planilha XP'
   idempotency_key, unique (user_id, idempotency_key),
+  orig_currency, orig_value, fx_rate, fx_date, fx_source 'ptax'|'fechamento',  -- outra moeda
+  fee_asset, fee_quantity,                                             -- taxa como foi paga
   version, created_at, updated_at, voided_at, voided_by, void_reason)
 ledger.movement_history (movement_id, version, op, before jsonb, after jsonb, actor, reason, at)
 
@@ -200,6 +202,8 @@ imports.rows     (id, file_id, user_id, position, line_numbers int[], raw jsonb,
                   |'ignored', messages jsonb, match_movement_ids uuid[],
                   decision 'import'|'keep_existing'|'replace'|'import_new',
                   movement_id → ledger.movements)
+imports.profiles (id, user_id, name, mapping jsonb, options jsonb, created_at, updated_at,
+                  last_used_at)          -- só nomes de colunas e opções, nunca conteúdo
 
 -- assistant (por usuário)
 assistant.conversations  (id, user_id, title, created_at)
@@ -507,8 +511,12 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
   o tamanho. O leitor só carrega as colunas que o adaptador declara (CPF, nome e qualquer
   outra coluna nem entram na memória do resto do sistema); texto livre com cara de CPF é
   mascarado; e uma constraint no banco recusa CPF formatado no `raw`.
-- **Template para baixar** na própria tela (`.xlsx` e `.csv`), gerado pelo mesmo script das
-  fixtures (`backend/packages/importers/tests/fixtures/build_fixtures.py`).
+- **Templates para baixar** na própria tela (bolsa e cripto, `.xlsx` e `.csv`), gerados pelo
+  mesmo script das fixtures (`backend/packages/importers/tests/fixtures/build_fixtures.py`).
+- **Formato desconhecido:** a pré-visualização mostra as colunas do arquivo e o usuário diz
+  qual é cada campo (data, tipo, ativo, quantidade, preço, valor, taxa, moeda...), com
+  corretora fixa, formato de data e de número. Isso vira um perfil salvo por usuário (RLS),
+  reconhecido pelo cabeçalho nas próximas vezes. Serve para bolsa e para cripto.
 - **No /demo**, uma pré-visualização de exemplo com dados inventados, sem chamada ao backend.
 
 ## 7. Decisões confirmadas
@@ -582,6 +590,56 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
   inteira, com a linha e o motivo (tudo ou nada).
 - **Template ganhou a coluna opcional `tipo_provento`** (padrão: dividendo para ação,
   rendimento para FII, juros para Tesouro e renda fixa).
+
+### Cripto e perfis de importação (Fase 4, etapa 1c)
+
+- **PTAX:** a de venda é a série SGS **1** (a série 10813 é a de compra; conferido na API do
+  BCB, a 1 vem sempre maior). Entra em `market.indicators` como `PTAX_VENDA`, pelo job
+  diário e pelo histórico.
+- **Conversão para reais:** dólar e stablecoins (USDT, USDC, FDUSD...) pela PTAX de venda
+  do dia da operação; outra cripto usada como moeda (par ETH/BTC, taxa em BNB) pelo
+  fechamento do dia em reais. Sem cotação no dia (fim de semana, feriado, PTAX de hoje
+  ainda não publicada), vale a última anterior, até 10 dias, e a linha diz qual data foi
+  usada. O movimento guarda moeda, valor original, cotação, data e fonte.
+- **Cada negociação mexe nos dois saldos.** Comprar BTC com USDT vira compra de BTC e venda
+  de USDT; a taxa paga em BNB vira custo (em reais, somado à compra) e venda daquele BNB.
+  Taxa na própria moeda comprada sai da quantidade recebida e entra como custo. Real e
+  dólar não são posição, então pagar com eles não gera contrapartida.
+- **Recompensas de Earn e staking** entram como provento pelo valor do dia e, junto, a
+  quantidade recebida entra como compra pelo mesmo valor (reinvestida). Assim o rendimento
+  aparece na rentabilidade sem distorcer o aporte, e o saldo da moeda bate com a exchange.
+  Recompensa de menos de 1 centavo não vira provento, só a quantidade entra.
+- **Binance:** trades (Spot, layout atual e antigo), Convert, depósitos e saques, e o extrato
+  de transações. Do extrato vêm as recompensas; compras, vendas e conversões que também
+  aparecem nele são ignoradas, porque vêm dos exports de trades e de Convert. Depósito e
+  saque de cripto é transferência de custódia (backlog); em reais, é dinheiro em conta.
+  P2P e Auto-Invest pedem lançamento manual. Horário em UTC vira o dia em Brasília.
+  `User_ID`, endereço de carteira, TXID e observações nunca são lidos.
+- **Perfis:** guardam só os nomes das colunas e as opções. O tipo de operação é lido por um
+  vocabulário fixo (compra, buy, C; venda, sell, V; dividendo, rendimento, JCP; recompensa,
+  staking), então nenhum valor do arquivo precisa ser guardado. O perfil reconhece o arquivo
+  quando todas as colunas mapeadas estão no cabeçalho. Cada perfil é uma fonte própria para
+  a reconciliação.
+- **Teste de contraste:** a única exceção de visibilidade é texto escondido atrás de uma
+  barra fixa (barra de ação da importação, dock, barra do topo), documentada no teste.
+
+### Template de cripto
+
+CSV ou XLSX, vírgula decimal, datas `dd/mm/aaaa`, uma linha por operação. Exemplo em
+`reference/import-template/cauri-cripto.*` e no botão "Template cripto".
+
+| coluna | obrigatória | exemplo | notas |
+|---|---|---|---|
+| `data` | sim | `12/03/2025` | |
+| `tipo` | sim | `compra` | compra, venda ou recompensa |
+| `ativo` | sim | `ETH` | código da cripto |
+| `quantidade` | sim | `0,1` | |
+| `preco` | compra e venda | `2.000,00` | preço unitário na moeda do preço |
+| `moeda do preco` | não | `USDT` | BRL (padrão), USD ou uma cripto; cripto gera a contrapartida |
+| `taxa` | não | `0,0001` | |
+| `ativo da taxa` | não | `BNB` | sem ela, a taxa está na moeda do preço |
+| `exchange` | sim | `Binance` | id ou nome cadastrado |
+| `obs` | não | | texto livre |
 
 ### Template genérico de planilha
 
