@@ -120,11 +120,13 @@ def test_series_do_bcb_corretas():
         bcb_sgs.SELIC_META.code,
         bcb_sgs.SELIC_EFETIVA.code,
         bcb_sgs.IPCA.code,
+        bcb_sgs.PTAX_VENDA.code,
     ) == (
         12,
         432,
         1178,
         433,
+        1,  # PTAX de venda; a de compra é a 10813 (conferido na API: a 1 vem sempre maior)
     )
 
 

@@ -1,4 +1,7 @@
-"""Séries do Banco Central (SGS): CDI, Selic meta, Selic efetiva e IPCA.
+"""Séries do Banco Central (SGS): CDI, Selic meta, Selic efetiva, IPCA e PTAX de venda.
+
+A PTAX de venda (série 1; a série 10813 é a de compra) converte para reais as operações
+em dólar e em stablecoins. Sai por volta das 13h dos dias úteis.
 
 Endpoint: https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados
 Séries diárias aceitam no máximo 10 anos por consulta; pedimos em janelas de 5.
@@ -30,7 +33,8 @@ CDI = Series("CDI", 12, "% a.d.")
 SELIC_META = Series("SELIC_META", 432, "% a.a.")
 SELIC_EFETIVA = Series("SELIC_EFETIVA", 1178, "% a.a.")
 IPCA = Series("IPCA", 433, "% a.m.")
-ALL = (CDI, SELIC_META, SELIC_EFETIVA, IPCA)
+PTAX_VENDA = Series("PTAX_VENDA", 1, "R$/US$")
+ALL = (CDI, SELIC_META, SELIC_EFETIVA, IPCA, PTAX_VENDA)
 
 
 def parse(payload: list[dict[str, Any]]) -> list[tuple[date, Decimal]]:
