@@ -42,13 +42,17 @@ def _get(
     return response
 
 
+def to_decimal(value: float | int | str) -> Decimal:
+    """Preço da resposta JSON em Decimal; repr evita levar o erro binário do float."""
+    return Decimal(repr(value)) if isinstance(value, float) else Decimal(str(value))
+
+
 def parse_history(payload: dict[str, Any]) -> list[tuple[date, Decimal]]:
     """Pontos ``[ms, preço]`` viram ``(data em Brasília, preço)``; o último de cada dia vale."""
     by_day: dict[date, Decimal] = {}
     for ms, price in payload.get("prices", []):
         moment = datetime.fromtimestamp(ms / 1000, tz=UTC).astimezone(SAO_PAULO)
-        # repr evita levar o erro binário do float da resposta para o Decimal.
-        by_day[moment.date()] = Decimal(repr(price))
+        by_day[moment.date()] = to_decimal(price)
     return sorted(by_day.items())
 
 
