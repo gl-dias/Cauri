@@ -18,5 +18,6 @@ entrou ainda.
   inventadas. Quando houver um export real, conferir nomes de colunas e os tipos de
   "Movimentação" que aparecem (só o layout; nenhum dado do arquivo vai para o repo).
 - **Passada de layout com export real da Binance.** Mesmo caso: trades (Spot), Convert,
-  depósitos e saques e o extrato de transações seguem o layout público, com fixtures
-  inventadas.
+  P2P, depósitos e saques e o extrato de transações seguem o layout público, com fixtures
+  inventadas. Conferir também o fuso do "Created Time" do P2P (hoje tratado como UTC, como os
+  outros exports).

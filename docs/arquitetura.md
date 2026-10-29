@@ -189,6 +189,7 @@ ledger.movements (
   idempotency_key, unique (user_id, idempotency_key),
   orig_currency, orig_value, fx_rate, fx_date, fx_source 'ptax'|'fechamento',  -- outra moeda
   fee_asset, fee_quantity,                                             -- taxa como foi paga
+  opening_balance,                       -- compra marcada como saldo inicial
   version, created_at, updated_at, voided_at, voided_by, void_reason)
 ledger.movement_history (movement_id, version, op, before jsonb, after jsonb, actor, reason, at)
 
@@ -204,6 +205,8 @@ imports.rows     (id, file_id, user_id, position, line_numbers int[], raw jsonb,
                   movement_id → ledger.movements)
 imports.profiles (id, user_id, name, mapping jsonb, options jsonb, created_at, updated_at,
                   last_used_at)          -- só nomes de colunas e opções, nunca conteúdo
+-- batches também guarda suggestions (saldos iniciais sugeridos); rows guarda transfer
+-- (depósito ou saque lido do arquivo, que explica saldo que falta)
 
 -- assistant (por usuário)
 assistant.conversations  (id, user_id, title, created_at)
@@ -623,6 +626,28 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
 - **Teste de contraste:** a única exceção de visibilidade é texto escondido atrás de uma
   barra fixa (barra de ação da importação, dock, barra do topo), documentada no teste.
 
+### Saldo inicial (fechamento da Fase 4)
+
+- **Saldo inicial é uma compra marcada** (`opening_balance`): posição que já existia antes
+  do histórico, com data, quantidade e custo médio informados pelo usuário. O "aporte" do
+  Cauri é o tipo da renda fixa, então a marca vai na compra. O custo informado vale para o
+  preço médio; para a rentabilidade, o engine conta a entrada pelo valor de mercado do dia,
+  senão um custo antigo baixo viraria "rendimento" no dia em que o saldo entra.
+- **Venda descoberta na importação vira oferta de saldo inicial.** A pré-visualização calcula,
+  por ativo, quanto falta e desde quando (simulando todas as vendas do envio, não só a
+  primeira) e sugere o saldo: na data do depósito que explica o saldo, quando há um no envio,
+  ou na véspera da primeira venda descoberta. O custo médio vem preenchido com o fechamento do
+  dia (PTAX de venda para stablecoins), marcado como sugestão. Incluir o saldo põe uma linha
+  "Saldos iniciais" no lote e confere tudo de novo pelos rascunhos guardados, sem reenviar os
+  arquivos; ele só entra no ledger junto com o resto, ao confirmar.
+- **Depósito de cripto continua sem mexer na posição**, mas quando ele explica um saldo que
+  falta, a linha do depósito avisa e a sugestão usa a data e a quantidade dele.
+- **P2P da Binance** (compra e venda de cripto com real, a entrada mais comum de USDT no
+  Brasil) virou adaptador. O P2P que aparece no extrato é ignorado, porque vem desse export.
+  O apelido da contraparte e o número da ordem nunca são lidos.
+- **Saldo inicial também no lançamento manual** (tipo "Saldo inicial") e nos templates
+  (`saldo_inicial` no de bolsa, `saldo inicial` no de cripto e nos perfis).
+
 ### Template de cripto
 
 CSV ou XLSX, vírgula decimal, datas `dd/mm/aaaa`, uma linha por operação. Exemplo em
@@ -631,7 +656,7 @@ CSV ou XLSX, vírgula decimal, datas `dd/mm/aaaa`, uma linha por operação. Exe
 | coluna | obrigatória | exemplo | notas |
 |---|---|---|---|
 | `data` | sim | `12/03/2025` | |
-| `tipo` | sim | `compra` | compra, venda ou recompensa |
+| `tipo` | sim | `compra` | compra, venda, recompensa ou saldo inicial (preço = custo médio) |
 | `ativo` | sim | `ETH` | código da cripto |
 | `quantidade` | sim | `0,1` | |
 | `preco` | compra e venda | `2.000,00` | preço unitário na moeda do preço |
@@ -649,7 +674,7 @@ de exemplo fica em `reference/import-template/` e no botão "Template" da tela I
 | coluna | obrigatória | exemplo | notas |
 |---|---|---|---|
 | `data` | sim | `15/03/2026` | data da operação |
-| `tipo` | sim | `compra` | compra, venda, aporte, resgate, provento, desdobramento, grupamento, bonificacao |
+| `tipo` | sim | `compra` | compra, venda, aporte, resgate, provento, desdobramento, grupamento, bonificacao, saldo_inicial (preço = custo médio) |
 | `ativo` | sim | `PETR4` | ticker, nome do título do Tesouro ou rótulo do CDB/LCI |
 | `classe` | sim | `acao` | acao, fii, tesouro, renda_fixa, cripto |
 | `quantidade` | depende | `100` | compra e venda |
