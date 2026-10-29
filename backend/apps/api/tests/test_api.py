@@ -541,3 +541,52 @@ class TestAssistente:
             f"/v1/assistant/proposals/{reply['proposal']['id']}/confirm", headers=auth(bruno)
         )
         assert res.status_code == 404
+
+
+class TestProtecaoDeCusto:
+    @pytest.fixture
+    def limited(self, api_pool, api_url, reference_data):
+        from cauri_nl_assistant import RuleExtractor
+
+        settings = Settings(
+            database_url=api_url,
+            jwt_secret=LOCAL_JWT_SECRET,
+            supabase_url=None,
+            assistant_daily_limit=1,
+        )
+        app = create_app(
+            settings, pool=api_pool, extractor=RuleExtractor(), transcriber=FakeTranscriber()
+        )
+        with TestClient(app) as c:
+            yield c
+
+    def test_limite_de_audios_e_de_mensagens(self, limited, make_user):
+        user = make_user()
+        audio = [("audio", ("fala.webm", b"audio", "audio/webm"))]
+        assert (
+            limited.post("/v1/assistant/transcribe", files=audio, headers=auth(user)).status_code
+            == 200
+        )
+        res = limited.post("/v1/assistant/transcribe", files=audio, headers=auth(user))
+        assert res.status_code == 429
+        assert "limite de 1 áudios" in res.json()["detail"]
+
+        first = limited.post("/v1/assistant/messages", json={"text": "bom dia"}, headers=auth(user))
+        assert first.status_code == 201
+        res = limited.post("/v1/assistant/messages", json={"text": "bom dia"}, headers=auth(user))
+        assert res.status_code == 429
+        assert "Amanhã libera de novo" in res.json()["detail"]
+
+    def test_audio_e_frase_grandes_demais(self, assistant_client, make_user):
+        user = make_user()
+        big = [("audio", ("fala.webm", b"x" * (2 * 1024 * 1024 + 1), "audio/webm"))]
+        assert (
+            assistant_client.post(
+                "/v1/assistant/transcribe", files=big, headers=auth(user)
+            ).status_code
+            == 413
+        )
+        res = assistant_client.post(
+            "/v1/assistant/messages", json={"text": "a" * 501}, headers=auth(user)
+        )
+        assert res.status_code == 422

@@ -31,6 +31,7 @@ def create_app(
         app.state.verifier = TokenVerifier(settings)
         app.state.extractor = extractor or _extractor(settings)
         app.state.transcriber = transcriber or _transcriber(settings)
+        app.state.daily_limit = settings.assistant_daily_limit
         yield
         if own_pool:
             app.state.pool.close()

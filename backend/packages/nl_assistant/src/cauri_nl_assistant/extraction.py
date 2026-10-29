@@ -127,6 +127,8 @@ class SpokenOp:
 class Extraction:
     ops: tuple[SpokenOp, ...]
     model: str  # "claude-haiku-5-5" ou "regras"
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     def to_json(self) -> dict[str, Any]:
         return {"operacoes": [op.to_json() for op in self.ops]}

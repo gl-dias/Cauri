@@ -87,4 +87,10 @@ def parse_response(data: dict[str, Any], model: str) -> Extraction:
         for op in (SpokenOp.from_json(o) for o in raw_ops if isinstance(o, dict))
         if op.ativo or op.tipo == "outro"
     )
-    return Extraction(ops=ops, model=model)
+    usage = data.get("usage") or {}
+    return Extraction(
+        ops=ops,
+        model=model,
+        input_tokens=int(usage.get("input_tokens") or 0),
+        output_tokens=int(usage.get("output_tokens") or 0),
+    )

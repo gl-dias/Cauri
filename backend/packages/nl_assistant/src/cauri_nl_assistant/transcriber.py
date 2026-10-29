@@ -13,7 +13,8 @@ import httpx
 
 GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 DEFAULT_MODEL = "whisper-large-v3-turbo"
-MAX_AUDIO_BYTES = 10 * 1024 * 1024
+# Uns 2 minutos de fala em webm/opus; o front para de gravar sozinho aos 30 segundos.
+MAX_AUDIO_BYTES = 2 * 1024 * 1024
 
 
 class TranscriptionError(Exception):

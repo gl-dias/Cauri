@@ -48,8 +48,16 @@ _UNSUPPORTED = (
 )
 
 
+MAX_TEXT = 500  # caracteres por frase: o bastante para algumas operações, barato no Haiku
+DEFAULT_DAILY_LIMIT = 50
+
+
 class AssistantError(Exception):
     """Pedido recusado, com mensagem para a tela."""
+
+
+class LimitReachedError(AssistantError):
+    """Limite diário de chamadas pagas do usuário."""
 
 
 class ProposalNotFoundError(AssistantError):
@@ -81,19 +89,50 @@ def send(
     today: date,
     conversation_id: UUID | None = None,
     input_mode: str = "texto",
+    daily_limit: int = DEFAULT_DAILY_LIMIT,
 ) -> Reply:
     text = text.strip()
     if not text:
         raise AssistantError("Escreva ou fale a operação.")
+    if len(text) > MAX_TEXT:
+        raise AssistantError(
+            f"Frase longa demais (máximo {MAX_TEXT} caracteres). Mande uma operação por vez."
+        )
     store = ledger.conversations
+    if store.usage_on(user_id, "mensagem", today) >= daily_limit:
+        raise LimitReachedError(
+            f"Você chegou ao limite de {daily_limit} mensagens por hoje. Amanhã libera de novo; "
+            "até lá, dá para lançar à mão ou importar uma planilha."
+        )
     if conversation_id is None:
         conversation_id = store.create(user_id, text[:60])
     elif not store.exists(user_id, conversation_id):
         raise AssistantError("Conversa não encontrada.")
 
-    # A frase vai para o extrator antes de qualquer gravação: se ele falhar, nada fica pela
-    # metade. O extrator recebe só o texto e a data de hoje.
-    extraction = extract_safely(extractor, text, today)
+    # O extrator recebe só o texto e a data de hoje. Cada chamada fica registrada (tokens),
+    # inclusive a que falhou: é ela que conta para o limite e para o custo.
+    provider = "regras" if extractor.model == "regras" else "anthropic"
+    try:
+        extraction = extract_safely(extractor, text, today)
+    except ExtractionError as exc:
+        store.record_usage(
+            user_id, provider=provider, kind="mensagem", model=extractor.model, ok=False, day=today
+        )
+        user_message = store.add_message(
+            user_id, conversation_id, "user", text, input_mode=input_mode
+        )
+        message = store.add_message(user_id, conversation_id, "assistant", str(exc))
+        return Reply(conversation_id, user_message, message, str(exc), None)
+    store.record_usage(
+        user_id,
+        provider=provider,
+        kind="mensagem",
+        model=extraction.model,
+        ok=True,
+        day=today,
+        input_tokens=extraction.input_tokens,
+        output_tokens=extraction.output_tokens,
+    )
     user_message = store.add_message(
         user_id,
         conversation_id,

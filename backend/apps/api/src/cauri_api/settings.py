@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     )
     anthropic_model: str = "claude-haiku-5-5"
     assistant_extractor: Literal["anthropic", "regras"] = "anthropic"
+    # Proteção de custo: chamadas pagas por usuário por dia (mensagens e, à parte,
+    # transcrições).
+    assistant_daily_limit: int = 50
     # Transcrição de voz (Whisper pela Groq). Sem chave, o front usa a do navegador.
     groq_api_key: str | None = Field(
         default=None, validation_alias=AliasChoices("GROQ_API_KEY", "CAURI_GROQ_API_KEY")

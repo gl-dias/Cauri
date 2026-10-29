@@ -107,6 +107,7 @@ def send(body: MessageIn, request: Request, session: SessionDep) -> SendOut:
             today=today,
             conversation_id=body.conversation_id,
             input_mode=body.input_mode,
+            daily_limit=request.app.state.daily_limit,
         )
         store = ledger.conversations
         messages = [
@@ -225,13 +226,43 @@ async def transcribe(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "Sem transcrição no servidor: o navegador transcreve.",
         )
-    with session.member():
-        pass  # só membros transcrevem
     content = await audio.read(MAX_AUDIO_BYTES + 1)
-    text = transcriber.transcribe(
-        content, audio.filename or "fala.webm", audio.content_type or "audio/webm"
-    )
+    if not content or len(content) > MAX_AUDIO_BYTES:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE if content else status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Áudio longo demais: fale uma operação por vez." if content else "Áudio vazio.",
+        )
+    limit: int = request.app.state.daily_limit
+    with session.member() as conn:
+        store = Ledger(conn).conversations
+        if store.usage_on(session.user.id, "transcricao", today_sp()) >= limit:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"Você chegou ao limite de {limit} áudios por hoje. Amanhã libera de novo.",
+            )
+    try:
+        text = transcriber.transcribe(
+            content, audio.filename or "fala.webm", audio.content_type or "audio/webm"
+        )
+    except assistant.TranscriptionError:
+        _record_transcription(session, len(content), ok=False)
+        raise
+    _record_transcription(session, len(content), ok=True)
     return TranscriptionOut(text=text)
+
+
+def _record_transcription(session: SessionDep, audio_bytes: int, *, ok: bool) -> None:
+    """Chamada à Groq registrada em transação própria: a que falhou também conta."""
+    with session.member() as conn:
+        Ledger(conn).conversations.record_usage(
+            session.user.id,
+            provider="groq",
+            kind="transcricao",
+            model="whisper",
+            ok=ok,
+            day=today_sp(),
+            audio_bytes=audio_bytes,
+        )
 
 
 def _act(session: SessionDep, action: Any) -> ProposalOut:

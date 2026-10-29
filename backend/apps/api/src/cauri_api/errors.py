@@ -65,6 +65,8 @@ def install(app: FastAPI) -> None:
     async def _assistant(_: Request, exc: assistant.AssistantError) -> JSONResponse:
         if isinstance(exc, assistant.ProposalNotFoundError):
             code = status.HTTP_404_NOT_FOUND
+        elif isinstance(exc, assistant.LimitReachedError):
+            code = status.HTTP_429_TOO_MANY_REQUESTS
         elif isinstance(exc, assistant.ProposalClosedError):
             code = status.HTTP_409_CONFLICT
         else:

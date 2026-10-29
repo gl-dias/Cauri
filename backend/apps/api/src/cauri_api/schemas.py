@@ -329,7 +329,7 @@ class AssistantConfigOut(BaseModel):
 
 
 class MessageIn(_In):
-    text: str = Field(min_length=1, max_length=2000)
+    text: str = Field(min_length=1, max_length=500)
     conversation_id: UUID | None = None
     input_mode: Literal["texto", "voz"] = "texto"
 

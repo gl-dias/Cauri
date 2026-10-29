@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -140,6 +140,43 @@ class ConversationStore:
         assert row is not None
         created: UUID = row["id"]
         return created
+
+    def record_usage(
+        self,
+        user_id: UUID,
+        *,
+        provider: str,
+        kind: Literal["mensagem", "transcricao"],
+        model: str,
+        ok: bool,
+        day: date,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        audio_bytes: int = 0,
+    ) -> None:
+        """Uma chamada paga (Haiku ou Whisper), para o limite diário e para o Admin."""
+        self._conn.execute(
+            "insert into ops.llm_usage (user_id, day, provider, kind, model, input_tokens,"
+            " output_tokens, audio_bytes, ok) values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            [
+                user_id,
+                day,
+                provider,
+                kind,
+                model[:80],
+                input_tokens,
+                output_tokens,
+                audio_bytes,
+                ok,
+            ],
+        )
+
+    def usage_on(self, user_id: UUID, kind: str, day: date) -> int:
+        row = self._conn.execute(
+            "select count(*) as n from ops.llm_usage where user_id = %s and kind = %s and day = %s",
+            [user_id, kind, day],
+        ).fetchone()
+        return int(row["n"]) if row else 0
 
     def conversation_of(self, user_id: UUID, message_id: UUID) -> UUID | None:
         row = self._conn.execute(

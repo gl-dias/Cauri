@@ -16,7 +16,10 @@ from cauri_nl_assistant.llm import DEFAULT_MODEL, AnthropicExtractor
 from cauri_nl_assistant.resolver import Ask, NotFound, Resolved, Resolver
 from cauri_nl_assistant.rules import RuleExtractor
 from cauri_nl_assistant.service import (
+    DEFAULT_DAILY_LIMIT,
+    MAX_TEXT,
     AssistantError,
+    LimitReachedError,
     ProposalClosedError,
     ProposalNotFoundError,
     Reply,
@@ -31,7 +34,9 @@ from cauri_nl_assistant.service import (
 from cauri_nl_assistant.transcriber import GroqTranscriber, Transcriber, TranscriptionError
 
 __all__ = [
+    "DEFAULT_DAILY_LIMIT",
     "DEFAULT_MODEL",
+    "MAX_TEXT",
     "AnthropicExtractor",
     "Ask",
     "AssistantError",
@@ -39,6 +44,7 @@ __all__ = [
     "ExtractionError",
     "Extractor",
     "GroqTranscriber",
+    "LimitReachedError",
     "NotFound",
     "ProposalClosedError",
     "ProposalNotFoundError",

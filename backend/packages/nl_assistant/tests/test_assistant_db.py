@@ -278,3 +278,70 @@ def test_frase_sem_operacao_e_conversa_de_outro_usuario(user, make_user, as_user
         assert Ledger(conn).conversations.recent(other.id) == []
         with pytest.raises(assistant.ProposalNotFoundError):
             assistant.confirm(Ledger(conn, today=TODAY), other.id, proposal.id, today=TODAY)
+
+
+class BrokenExtractor:
+    model = "claude-haiku-5-5"
+
+    def extract(self, text, today):
+        raise assistant.ExtractionError("O assistente não respondeu agora. Tente de novo.")
+
+
+class CountingExtractor:
+    model = "claude-haiku-5-5"
+
+    def extract(self, text, today):
+        result = assistant.RuleExtractor().extract(text, today)
+        return assistant.Extraction(result.ops, self.model, input_tokens=812, output_tokens=95)
+
+
+def usage(conn, user_id):
+    return conn.execute(
+        "select provider, kind, model, input_tokens, output_tokens, ok from ops.llm_usage"
+        " where user_id = %s order by id",
+        [user_id],
+    ).fetchall()
+
+
+def test_limite_diario_e_registro_de_tokens(user, as_user):
+    with as_user(user) as conn:
+        ledger = Ledger(conn, today=TODAY)
+        for _ in range(2):
+            assistant.send(
+                ledger, user.id, "comprei 1 PETR4 a 30", extractor=CountingExtractor(),
+                today=TODAY, daily_limit=2,
+            )  # fmt: skip
+        with pytest.raises(assistant.LimitReachedError, match="limite de 2 mensagens"):
+            assistant.send(
+                ledger, user.id, "comprei 1 PETR4 a 30", extractor=CountingExtractor(),
+                today=TODAY, daily_limit=2,
+            )  # fmt: skip
+        rows = usage(conn, user.id)
+        assert len(rows) == 2
+        assert rows[0]["input_tokens"] == 812
+        assert rows[0]["output_tokens"] == 95
+        assert (rows[0]["provider"], rows[0]["kind"], rows[0]["ok"]) == (
+            "anthropic",
+            "mensagem",
+            True,
+        )
+
+
+def test_falha_do_modelo_vira_resposta_e_conta_no_uso(user, as_user):
+    with as_user(user) as conn:
+        reply = assistant.send(
+            Ledger(conn, today=TODAY), user.id, "comprei 1 PETR4", extractor=BrokenExtractor(),
+            today=TODAY,
+        )  # fmt: skip
+        assert reply.proposal_id is None
+        assert "não respondeu" in reply.text
+        [row] = usage(conn, user.id)
+        assert row["ok"] is False
+
+
+def test_frase_longa_demais_nem_chega_ao_modelo(user, as_user):
+    with as_user(user) as conn, pytest.raises(assistant.AssistantError, match="longa demais"):
+        assistant.send(
+            Ledger(conn, today=TODAY), user.id, "comprei 1 PETR4 " * 40,
+            extractor=BrokenExtractor(), today=TODAY,
+        )  # fmt: skip
