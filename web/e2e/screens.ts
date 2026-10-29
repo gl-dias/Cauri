@@ -62,6 +62,18 @@ export const SCREENS: Screen[] = [
       await expect(page.getByRole("button", { name: "Importar 8" })).toBeVisible();
     },
   },
+  { name: "demo-assistente", path: "/demo/assistente", ready: "Pronto: 2 movimentações gravadas.", setup: mockDemo },
+  {
+    name: "app-assistente",
+    path: "/app/assistente",
+    ready: "Experimente:",
+    setup: (page) => mockApp(page),
+    after: async (page) => {
+      await page.getByLabel("Mensagem para o assistente").fill("comprei 1 petrobras a 31 e vendi 40 taesa a 36");
+      await page.getByRole("button", { name: "Enviar" }).click();
+      await expect(page.getByText("Você tem PETR3 e PETR4. Qual delas?")).toBeVisible();
+    },
+  },
   {
     name: "app-importar-saldo",
     path: "/app/importar",

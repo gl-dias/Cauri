@@ -3,7 +3,7 @@
  * Login por magic link de um convidado fictício, lançamento manual gravado pela API, tela
  * de admin e a allowlist barrando quem não foi convidado. Pré-requisitos:
  *   supabase start; cauri-jobs bootstrap-admin (CAURI_ADMIN_EMAIL=e2e-admin@example.test);
- *   uvicorn da API na porta 8000; npm run dev.
+ *   uvicorn da API na porta 8000 com CAURI_ASSISTANT_EXTRACTOR=regras; npm run dev.
  */
 import { expect, test, type Page } from "@playwright/test";
 
@@ -127,6 +127,20 @@ test.describe("ao vivo", () => {
     await expect(page.getByText("Falta saldo de PETR4", { exact: true })).toBeHidden();
     await page.getByRole("button", { name: "Descartar" }).click();
     await expect(page.getByText("Arraste os arquivos aqui")).toBeVisible();
+  });
+
+  test("assistente entende a frase, mostra o cartão e grava ao confirmar", async ({ page }) => {
+    // A API local roda com CAURI_ASSISTANT_EXTRACTOR=regras (sem chave da Anthropic).
+    await login(page);
+    await page.goto("/app/assistente");
+    // Quantidade única por execução: os testes anteriores já lançaram PETR4 hoje.
+    const qty = 2 + (Date.now() % 900);
+    await page.getByLabel("Mensagem para o assistente").fill(`comprei ${qty} PETR4 a 31 reais`);
+    await page.getByRole("button", { name: "Enviar" }).click();
+    await expect(page.getByText("Entendi 1 operação. Confira o cartão e confirme.").last()).toBeVisible();
+    await expect(page.getByText("pronta").last()).toBeVisible();
+    await page.getByRole("button", { name: "Confirmar" }).last().click();
+    await expect(page.getByText("Pronto: 1 movimentação gravada.").last()).toBeVisible();
   });
 
   test("arquivo desconhecido vira perfil e passa a ser reconhecido", async ({ page }) => {

@@ -8,6 +8,7 @@ import path from "node:path";
 
 import type { Page, Route } from "@playwright/test";
 
+import { SAMPLE_CONVERSATION, SAMPLE_CONVERSATIONS } from "../src/features/assistant/sample";
 import { SAMPLE_BATCH, SAMPLE_SHORTFALL_BATCH } from "../src/features/import/sample";
 
 export const LIVE = process.env.CAURI_E2E_LIVE === "1";
@@ -185,6 +186,12 @@ export async function mockApp(page: Page, { role = "admin" as "admin" | "user" }
     if (path.endsWith("/admin/allowlist") && req.method() === "GET") return route.fulfill({ json: ALLOWLIST });
     if (path.endsWith("/v1/imports") && req.method() === "GET") return route.fulfill({ json: RECENT_IMPORTS });
     if (path.endsWith("/v1/imports/profiles") && req.method() === "GET") return route.fulfill({ json: PROFILES });
+    if (path.endsWith("/v1/assistant/config")) return route.fulfill({ json: { llm: "anthropic", model: "claude-haiku-5-5", voice: "navegador" } });
+    if (path.endsWith("/v1/assistant/conversations")) return route.fulfill({ json: SAMPLE_CONVERSATIONS });
+    if (path.endsWith("/v1/assistant/messages") && req.method() === "POST") {
+      const [ask, reply] = SAMPLE_CONVERSATION.messages.slice(-2);
+      return route.fulfill({ status: 201, json: { conversation_id: SAMPLE_CONVERSATION.id, messages: [ask, reply] } });
+    }
     if (path.endsWith("/v1/imports") && req.method() === "POST") {
       // Arquivo "desconhecido": a API devolve só os nomes das colunas, para o mapeamento.
       const body = req.postDataBuffer()?.toString("latin1") ?? "";
