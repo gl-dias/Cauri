@@ -1,0 +1,4 @@
+# Backup semanal do Cauri: domingo às 04:00 (horário da VPS). Copiar para /etc/cron.d/.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 4 * * 0 root /opt/cauri/backup/cauri-backup.sh >> /var/log/cauri-backup.log 2>&1
