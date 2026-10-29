@@ -62,10 +62,16 @@ for (const screen of SCREENS) {
         if (r.width < 4 || r.height < 6 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
         const style = getComputedStyle(el);
         if (style.visibility === "hidden" || Number(style.opacity) === 0) continue;
-        // Texto coberto por outro elemento (barra de ação fixa, dock) não está visível: o que
-        // aparece ali é a barra, e o texto da barra é medido por conta própria.
+        // ÚNICA exceção de visibilidade: texto escondido atrás de uma barra fixa (barra de ação
+        // da importação, dock do celular ou barra do topo: position fixed ou sticky). Ali o que
+        // aparece é a barra, e o texto dela é medido por conta própria. Qualquer outra
+        // sobreposição continua medida normalmente.
         const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (hit && !el.contains(hit) && !hit.contains(el)) continue;
+        if (hit && !el.contains(hit) && !hit.contains(el)) {
+          let bar: Element | null = hit;
+          while (bar && !["fixed", "sticky"].includes(getComputedStyle(bar).position)) bar = bar.parentElement;
+          if (bar && !bar.contains(el)) continue;
+        }
         // Se o texto está dentro de um elemento com fundo próprio pequeno (selo, pílula
         // ativa), a amostra fica dentro dele: é esse fundo que está atrás das letras.
         let clip: { x: number; y: number; w: number; h: number } | null = null;

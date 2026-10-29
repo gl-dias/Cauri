@@ -139,6 +139,10 @@ const JOB_SOURCES = [
   ...["cotahist", "tesouro", "coingecko", "bcb_sgs", "calendar"].map((source) => ({ run_id: "r1", source, status: "ok", requested: 1, succeeded: 1, failed: 0, error_sample: null, duration_ms: 5000 })),
 ];
 
+const UNKNOWN_COLUMNS = ["Data Operação", "Operação", "Papel", "Qtde", "Preço", "Valor Total", "Corretagem"];
+const PROFILES = [
+  { id: "p-1", name: "Corretora Fictícia", mapping: { data: "Data", tipo: "Operação", ativo: "Papel", quantidade: "Qtde" }, options: { broker_id: "xp" }, created_at: "2026-10-10T12:00:00Z", last_used_at: "2026-10-20T21:10:00Z" },
+];
 const RECENT_IMPORTS = [
   { id: "r-imp-1", status: "committed", created_at: "2026-10-20T21:10:00Z", finished_at: "2026-10-20T21:11:00Z", labels: ["Template do Cauri, 01/2026 a 09/2026"], imported: 42 },
 ];
@@ -180,11 +184,16 @@ export async function mockApp(page: Page, { role = "admin" as "admin" | "user" }
     const path = new URL(req.url()).pathname;
     if (path.endsWith("/admin/allowlist") && req.method() === "GET") return route.fulfill({ json: ALLOWLIST });
     if (path.endsWith("/v1/imports") && req.method() === "GET") return route.fulfill({ json: RECENT_IMPORTS });
+    if (path.endsWith("/v1/imports/profiles") && req.method() === "GET") return route.fulfill({ json: PROFILES });
     if (path.endsWith("/v1/imports") && req.method() === "POST") {
-      return route.fulfill({ status: 201, json: { batch: SAMPLE_BATCH, problems: [], file_indexes: [0, 1] } });
+      // Arquivo "desconhecido": a API devolve só os nomes das colunas, para o mapeamento.
+      if ((req.postDataBuffer()?.toString("latin1") ?? "").includes("desconhecida")) {
+        return route.fulfill({ status: 201, json: { batch: null, problems: [{ index: 0, message: "Não reconheci o formato deste arquivo.", columns: UNKNOWN_COLUMNS }], file_indexes: [] } });
+      }
+      return route.fulfill({ status: 201, json: { batch: SAMPLE_BATCH, problems: [], file_indexes: [0, 1, 2] } });
     }
     if (path.endsWith("/commit")) {
-      return route.fulfill({ json: { created: 5, already_imported: 0, replaced: 0, skipped: 1, snapshots_updated: true } });
+      return route.fulfill({ json: { created: 8, already_imported: 0, replaced: 0, skipped: 1, snapshots_updated: true } });
     }
     if (path.endsWith("/movements/check")) {
       return route.fulfill({ json: { ok: true, checks: [{ index: 0, ok: true, errors: [], duplicates: [], already_posted: null }] } });

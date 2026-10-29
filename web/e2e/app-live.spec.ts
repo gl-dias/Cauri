@@ -105,6 +105,41 @@ test.describe("ao vivo", () => {
     await expect(page.getByText("Arraste os arquivos aqui")).toBeVisible();
   });
 
+  test("arquivo desconhecido vira perfil e passa a ser reconhecido", async ({ page }) => {
+    const since = Date.now() - 1000;
+    await requestLink(page, ADMIN);
+    await page.goto(await magicLink(ADMIN, since));
+    await expect(page).toHaveURL(/\/app/);
+
+    // Cabeçalho único por execução: o perfil é sempre novo e é apagado no fim.
+    const run = Date.now().toString(36);
+    const name = `Corretora e2e ${run}`;
+    const csv = Buffer.from(`Dia;Natureza;Papel ${run};Qtde;Preço\n02/03/2026;C;PETR4;1;31,00\n`);
+    const pick = async () => {
+      await page.goto("/app/importar");
+      await page.getByLabel("Escolher arquivos").setInputFiles({ name: "extrato-e2e.csv", mimeType: "text/csv", buffer: csv });
+      await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    };
+
+    await pick();
+    await expect(page.getByText("Formato novo: extrato-e2e.csv")).toBeVisible();
+    await page.getByLabel("Ativo *").selectOption(`Papel ${run}`);
+    await page.getByLabel("Corretora fixa").selectOption({ label: "XP Investimentos" });
+    await page.getByLabel("Nome do perfil").fill(name);
+    await page.getByRole("button", { name: "Salvar perfil e pré-visualizar" }).click();
+    await expect(page.getByText(`Perfil ${name}`)).toBeVisible();
+    await page.getByRole("button", { name: "Descartar" }).click();
+
+    // Da próxima vez, o arquivo é reconhecido direto pelo perfil.
+    await pick();
+    await expect(page.getByText(`Perfil ${name}`)).toBeVisible();
+    await page.getByRole("button", { name: "Descartar" }).click();
+
+    await page.getByRole("button", { name: `Apagar o perfil ${name}` }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Apagar" }).click();
+    await expect(page.getByRole("button", { name: `Apagar o perfil ${name}` })).toBeHidden();
+  });
+
   test("e-mail fora da allowlist vê a mesma mensagem e não recebe link", async ({ page }) => {
     const outsider = `nao-convidado-${Date.now()}@example.test`;
     const since = Date.now() - 1000;

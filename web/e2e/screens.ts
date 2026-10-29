@@ -59,7 +59,22 @@ export const SCREENS: Screen[] = [
         SAMPLE_FILENAMES.map((name) => ({ name, mimeType: "application/octet-stream", buffer: Buffer.from("fictício") })),
       );
       await page.getByRole("button", { name: "Pré-visualizar" }).click();
-      await expect(page.getByRole("button", { name: "Importar 5" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Importar 8" })).toBeVisible();
+    },
+  },
+  {
+    name: "app-importar-mapear",
+    path: "/app/importar",
+    ready: "Arraste os arquivos aqui",
+    setup: (page) => mockApp(page),
+    after: async (page) => {
+      await page.getByLabel("Escolher arquivos").setInputFiles({
+        name: "corretora-desconhecida.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from("fictício"),
+      });
+      await page.getByRole("button", { name: "Pré-visualizar" }).click();
+      await expect(page.getByText("Formato novo: corretora-desconhecida.csv")).toBeVisible();
     },
   },
 ];
