@@ -75,3 +75,6 @@ web/blob-report/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Prints
+prints/
