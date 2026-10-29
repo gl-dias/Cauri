@@ -44,7 +44,11 @@ class JobsConfig:
 
     @property
     def admin_email(self) -> str:
-        return _require("CAURI_ADMIN_EMAIL").lower()
+        """E-mail do admin inicial, do ambiente (ADMIN_EMAIL; CAURI_ADMIN_EMAIL também vale)."""
+        email = os.environ.get("ADMIN_EMAIL") or os.environ.get("CAURI_ADMIN_EMAIL")
+        if not email:
+            raise ConfigError("defina ADMIN_EMAIL no ambiente")
+        return email.strip().lower()
 
     @property
     def cache_dir(self) -> Path:

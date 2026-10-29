@@ -39,7 +39,7 @@ from cauri_ingest_market import (
 )
 from cauri_ingest_market.backfill import earliest_trade_date
 from cauri_ingest_market.sources import cotahist, tesouro
-from cauri_jobs import seed
+from cauri_jobs import health, seed
 from cauri_jobs.config import ConfigError, JobsConfig
 from cauri_jobs.demo import DEMO_B3_TICKERS, DEMO_CRYPTO_TICKERS
 from cauri_storage import Pool, admin_connection, make_pool, service_transaction
@@ -170,6 +170,16 @@ def cmd_daily(cfg: JobsConfig, args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_health(cfg: JobsConfig, args: argparse.Namespace) -> None:
+    """Sai com erro (e a mensagem) se faltar fechamento em N pregões seguidos."""
+    pool = make_pool(cfg.ingest_url, max_size=1)
+    with service_transaction(pool) as conn:
+        result = health.check(conn, until=last_closed_day(), business_days=args.business_days)
+    print(result.message)
+    if not result.ok:
+        sys.exit(1)
+
+
 def cmd_recalc(cfg: JobsConfig, args: argparse.Namespace) -> None:
     until = last_closed_day()
     pool = make_pool(cfg.ingest_url, max_size=2)
@@ -252,6 +262,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("daily", help="fechamento do dia e snapshots (job das 18h30 e 19h30)")
     p.add_argument("--pass", dest="pass_", choices=["first", "second"], default="first")
     p.add_argument("--date", type=date.fromisoformat, help="AAAA-MM-DD (padrão: hoje em Brasília)")
+    p = sub.add_parser("health", help="erro se faltar fechamento da B3 em N pregões seguidos")
+    p.add_argument("--business-days", type=int, default=2)
     p = sub.add_parser("recalc", help="recalcula snapshots (todas as carteiras ou uma)")
     p.add_argument("--user", type=uuid.UUID, help="id do usuário (padrão: todos)")
     p.add_argument("--from", dest="from_date", type=date.fromisoformat, help="AAAA-MM-DD")
@@ -269,6 +281,7 @@ def main(argv: list[str] | None = None) -> None:
         "bootstrap-admin": cmd_bootstrap_admin,
         "seed-demo": cmd_seed_demo,
         "daily": cmd_daily,
+        "health": cmd_health,
         "recalc": cmd_recalc,
     }
     try:
