@@ -24,8 +24,10 @@ from cauri_engine.calc import (
     RedemptionExceedsBalanceError,
     find_oversell,
     in_order,
+    replay,
 )
 from cauri_ledger import repo
+from cauri_ledger.conversations import ConversationStore
 from cauri_ledger.models import (
     CatalogAsset,
     DraftCheck,
@@ -541,6 +543,37 @@ class Ledger:
     def ids_for_keys(self, user_id: UUID, keys: Collection[str]) -> dict[str, UUID]:
         """Movimentação gravada (ativa ou removida) de cada chave de idempotência."""
         return repo.existing_keys(self._conn, user_id, list(keys))
+
+    def alias(self, alias_norm: str) -> tuple[str, str] | None:
+        """O que um apelido falado aponta: ("issuer", "PETR") ou ("asset", "BTC")."""
+        return repo.alias_target(self._conn, alias_norm)
+
+    def issuer_assets(self, issuer_code: str) -> list[CatalogAsset]:
+        return repo.issuer_assets(self._conn, issuer_code)
+
+    def last_close(self, ticker: str, on: date) -> tuple[Decimal, date] | None:
+        """Fechamento mais recente em reais até a data (preço sugerido quando falta)."""
+        return repo.last_close_brl(self._conn, ticker.strip().upper(), on)
+
+    def recent_brokers(self, user_id: UUID, asset_class: str | None = None) -> list[str]:
+        return repo.recent_brokers(self._conn, user_id, asset_class)
+
+    def holdings(self, user_id: UUID, tickers: Collection[str]) -> dict[str, dict[str, Decimal]]:
+        """Quantidade atual por ativo e por corretora (só o que é maior que zero)."""
+        ids, movements = self.timeline(user_id, tickers)
+        books = replay(movements)
+        out: dict[str, dict[str, Decimal]] = {}
+        for ticker, asset_id in ids.items():
+            book = books.get(asset_id)
+            if book is None or book.quantity <= 0:
+                continue
+            out[ticker] = {b: q for b, q in book.quantity_by_broker.items() if q > 0}
+        return out
+
+    @property
+    def conversations(self) -> ConversationStore:
+        """Conversas com o assistente (mensagens e cartões de confirmação)."""
+        return ConversationStore(self._conn)
 
     @property
     def imports(self) -> ImportStore:

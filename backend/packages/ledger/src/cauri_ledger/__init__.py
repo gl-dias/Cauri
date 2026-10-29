@@ -13,6 +13,13 @@ Importações usam também ``source_prefix`` (duplicados entre fontes), ``replac
 (lotes em pré-visualização).
 """
 
+from cauri_ledger.conversations import (
+    ConversationStore,
+    ConversationSummary,
+    ProposalStatus,
+    StoredMessage,
+    StoredProposal,
+)
 from cauri_ledger.models import (
     CatalogAsset,
     DraftCheck,
@@ -28,6 +35,7 @@ from cauri_ledger.models import (
     MovementPatch,
     PostResult,
     Shortfall,
+    duplicate_texts,
 )
 from cauri_ledger.service import Ledger
 from cauri_ledger.staging import (
@@ -46,6 +54,8 @@ from cauri_ledger.staging import (
 __all__ = [
     "BatchSummary",
     "CatalogAsset",
+    "ConversationStore",
+    "ConversationSummary",
     "Decision",
     "DraftCheck",
     "DuplicateCandidate",
@@ -62,11 +72,15 @@ __all__ = [
     "MovementNotFoundError",
     "MovementPatch",
     "PostResult",
+    "ProposalStatus",
     "RowStatus",
     "Shortfall",
     "StagedFile",
     "StagedRow",
     "StoredBatch",
     "StoredFile",
+    "StoredMessage",
+    "StoredProposal",
     "StoredRow",
+    "duplicate_texts",
 ]

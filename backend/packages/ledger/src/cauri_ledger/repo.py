@@ -109,6 +109,51 @@ def closes_brl(
     return out
 
 
+def alias_target(conn: Conn, alias_norm: str) -> tuple[str, str] | None:
+    """("issuer", "PETR") ou ("asset", "BTC") para um apelido já normalizado."""
+    row = conn.execute(
+        "select l.issuer_code, a.ticker from market.asset_aliases l"
+        " left join market.assets a on a.id = l.asset_id where l.alias_norm = %s",
+        [alias_norm],
+    ).fetchone()
+    if row is None:
+        return None
+    if row["issuer_code"]:
+        return "issuer", row["issuer_code"]
+    return "asset", row["ticker"]
+
+
+def issuer_assets(conn: Conn, issuer_code: str) -> list[CatalogAsset]:
+    rows = conn.execute(
+        "select ticker, class, name, maturity_date, active from market.assets"
+        " where issuer_code = %s and active order by ticker",
+        [issuer_code],
+    ).fetchall()
+    return [_catalog(r) for r in rows]
+
+
+def last_close_brl(conn: Conn, ticker: str, on: date) -> tuple[Decimal, date] | None:
+    row = conn.execute(
+        "select p.close, p.price_date from market.prices_daily p"
+        " join market.assets a on a.id = p.asset_id"
+        " where a.ticker = %s and p.currency = 'BRL' and p.price_date <= %s"
+        " order by p.price_date desc limit 1",
+        [ticker, on],
+    ).fetchone()
+    return (row["close"], row["price_date"]) if row else None
+
+
+def recent_brokers(conn: Conn, user_id: UUID, asset_class: str | None) -> list[str]:
+    """Corretoras das movimentações mais recentes do usuário (da classe, se informada)."""
+    rows = conn.execute(
+        "select broker_id, max(created_at) as last from ledger.movements"
+        " where user_id = %s and voided_at is null and (%s::text is null or asset_class::text = %s)"
+        " group by broker_id order by last desc limit 5",
+        [user_id, asset_class, asset_class],
+    ).fetchall()
+    return [r["broker_id"] for r in rows]
+
+
 def all_brokers(conn: Conn) -> dict[str, str]:
     rows = conn.execute("select id, name from market.brokers order by name").fetchall()
     return {r["id"]: r["name"] for r in rows}

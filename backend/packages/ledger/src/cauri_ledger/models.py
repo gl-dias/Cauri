@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -138,6 +139,21 @@ class Shortfall:
     trade_date: date
     available: Decimal
     missing: Decimal
+
+
+def duplicate_texts(duplicates: Sequence[DuplicateCandidate], suffix: str = "") -> list[str]:
+    """Uma frase por origem e data, com a contagem quando há mais de um parecido."""
+    groups: dict[tuple[str, date], int] = {}
+    for d in duplicates:
+        key = (d.origin_label or d.origin.value, d.trade_date)
+        groups[key] = groups.get(key, 0) + 1
+    out = []
+    for (label, day), count in groups.items():
+        times = "" if count == 1 else f" ({count} lançamentos parecidos)"
+        out.append(
+            f"Parece a mesma operação já lançada por {label} em {day:%d/%m/%Y}{times}.{suffix}"
+        )
+    return out
 
 
 @dataclass(frozen=True, slots=True)
