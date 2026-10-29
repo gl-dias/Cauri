@@ -8,13 +8,15 @@ Preços vêm com duas casas implícitas e podem estar cotados por lote (FATCOT),
 preço unitário é ``PREULT / 100 / FATCOT``.
 
 O arquivo do ano corrente é atualizado pela B3 toda noite; o cache local respeita isso.
+O download é grande (o do ano tem dezenas de MB) e a conexão às vezes cai no meio: a nova
+tentativa continua de onde parou (o servidor aceita Range) e o ZIP é conferido no fim.
 """
 
 from __future__ import annotations
 
 import time
 import zipfile
-from collections.abc import Collection, Iterator
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -28,6 +30,8 @@ BDI_STOCKS = "02"
 BDI_JUDICIAL_RECOVERY = "08"
 BDI_REITS = "12"
 _CURRENT_YEAR_MAX_AGE_S = 6 * 3600
+_ATTEMPTS = 4
+_RETRY_WAIT_S = 5.0  # multiplicado pelo número da tentativa
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +83,14 @@ def iter_quotes(zip_path: Path, tickers: Collection[str] | None = None) -> Itera
                     yield quote
 
 
-def download(year: int, cache_dir: Path, client: httpx.Client, *, today: date) -> Path:
+def download(
+    year: int,
+    cache_dir: Path,
+    client: httpx.Client,
+    *,
+    today: date,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Path:
     """Baixa (ou reaproveita do cache) o ZIP do ano. O do ano corrente expira em 6 horas."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     target = cache_dir / f"COTAHIST_A{year}.ZIP"
@@ -88,10 +99,29 @@ def download(year: int, cache_dir: Path, client: httpx.Client, *, today: date) -
         if fresh:
             return target
     partial = target.with_suffix(".part")
-    with client.stream("GET", URL.format(year=year), timeout=300) as response:
-        response.raise_for_status()
-        with partial.open("wb") as out:
-            for chunk in response.iter_bytes(1 << 20):
-                out.write(chunk)
+    partial.unlink(missing_ok=True)
+    for attempt in range(1, _ATTEMPTS + 1):
+        try:
+            _fetch_into(client, URL.format(year=year), partial)
+            break
+        except httpx.TransportError:
+            if attempt == _ATTEMPTS:
+                raise
+            sleep(_RETRY_WAIT_S * attempt)
+    if not zipfile.is_zipfile(partial):
+        partial.unlink()
+        raise ValueError(f"COTAHIST {year}: o arquivo baixado não é um ZIP completo")
     partial.replace(target)
     return target
+
+
+def _fetch_into(client: httpx.Client, url: str, partial: Path) -> None:
+    """Baixa para ``partial``, continuando do tamanho que já tem quando o servidor aceita."""
+    have = partial.stat().st_size if partial.exists() else 0
+    headers = {"Range": f"bytes={have}-"} if have else {}
+    with client.stream("GET", url, headers=headers, timeout=300) as response:
+        response.raise_for_status()
+        resumed = response.status_code == 206  # com 200, o servidor mandou o arquivo todo
+        with partial.open("ab" if resumed else "wb") as out:
+            for chunk in response.iter_bytes():  # grava cada pedaço assim que chega
+                out.write(chunk)

@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import csv
 import io
+import time
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -100,9 +101,21 @@ def parse(text: str) -> Iterator[TesouroPrice]:
         )
 
 
-def download(client: httpx.Client) -> str:
-    response = client.get(URL, timeout=300)
-    response.raise_for_status()
+_RETRY_WAITS_S = (5.0, 15.0)  # pausa antes da 2ª e da 3ª tentativa
+
+
+def download(client: httpx.Client, *, sleep: Callable[[float], None] = time.sleep) -> str:
+    """CSV de preços e taxas. Queda de conexão ou 5xx: até três tentativas."""
+    for wait in (*_RETRY_WAITS_S, None):
+        try:
+            response = client.get(URL, timeout=300)
+            if response.status_code < 500 or wait is None:
+                response.raise_for_status()
+                break
+        except httpx.TransportError:
+            if wait is None:
+                raise
+        sleep(wait)
     # O arquivo vem em latin-1 em alguns períodos; os nomes dos títulos usam acento.
     try:
         return response.content.decode("utf-8")

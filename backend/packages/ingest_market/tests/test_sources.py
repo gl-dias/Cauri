@@ -1,5 +1,6 @@
 """Parsers das fontes de mercado, com amostras reais das respostas (sem rede)."""
 
+import io
 import zipfile
 from datetime import date
 from decimal import Decimal
@@ -220,3 +221,107 @@ class TestApelidos:
     def test_mesmo_apelido_para_empresas_diferentes_e_erro(self):
         with pytest.raises(ValueError, match="aponta para ITUB e ITSA"):
             sync_aliases(None, {"ITUB": ["Itaú"], "ITSA": ["itau"]}, {})  # type: ignore[arg-type]
+
+
+def _zip_bytes() -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("COTAHIST_A2026.TXT", f"{HEADER}\n{PETR4}\n")
+    return buffer.getvalue()
+
+
+class _CortaNoMeio(httpx.SyncByteStream):
+    """Corpo que entrega um pedaço e cai, como a conexão com a B3 no GitHub Actions."""
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    def __iter__(self):
+        yield self.data
+        raise httpx.RemoteProtocolError(
+            "peer closed connection without sending complete message body"
+        )
+
+
+class TestDownloadCotahist:
+    TODAY = date(2026, 10, 29)
+
+    def _download(self, tmp_path, *responses):
+        queue, ranges, waits = list(responses), [], []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            ranges.append(request.headers.get("Range"))
+            return queue.pop(0)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        path = cotahist.download(2026, tmp_path, client, today=self.TODAY, sleep=waits.append)
+        return path, ranges, waits
+
+    def test_continua_de_onde_parou(self, tmp_path):
+        data = _zip_bytes()
+        half = len(data) // 2
+        path, ranges, waits = self._download(
+            tmp_path,
+            httpx.Response(200, stream=_CortaNoMeio(data[:half])),
+            httpx.Response(206, content=data[half:]),
+        )
+        assert ranges == [None, f"bytes={half}-"]
+        assert path.read_bytes() == data
+        assert waits == [5.0]
+        assert not path.with_suffix(".part").exists()
+
+    def test_servidor_que_ignora_range_manda_tudo_de_novo(self, tmp_path):
+        data = _zip_bytes()
+        path, _, _ = self._download(
+            tmp_path,
+            httpx.Response(200, stream=_CortaNoMeio(data[:10])),
+            httpx.Response(200, content=data),
+        )
+        assert path.read_bytes() == data
+
+    def test_desiste_depois_de_quatro_quedas(self, tmp_path):
+        data = _zip_bytes()
+        cuts = [httpx.Response(200, stream=_CortaNoMeio(data[:5]))] + [
+            httpx.Response(206, stream=_CortaNoMeio(data[5:6])) for _ in range(3)
+        ]
+        with pytest.raises(httpx.RemoteProtocolError):
+            self._download(tmp_path, *cuts)
+        assert not (tmp_path / "COTAHIST_A2026.ZIP").exists()
+
+    def test_zip_incompleto_nao_vai_para_o_cache(self, tmp_path):
+        with pytest.raises(ValueError, match="não é um ZIP completo"):
+            self._download(tmp_path, httpx.Response(200, content=_zip_bytes()[:-30]))
+        assert list(tmp_path.iterdir()) == []
+
+
+class TestDownloadTesouro:
+    def _client(self, *outcomes):
+        queue = list(outcomes)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            outcome = queue.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        return httpx.Client(transport=httpx.MockTransport(handler))
+
+    def test_tenta_de_novo_em_5xx_e_queda(self):
+        waits: list[float] = []
+        client = self._client(
+            httpx.Response(503),
+            httpx.ConnectError("caiu"),
+            httpx.Response(200, content=b"Tipo Titulo;Data Vencimento"),
+        )
+        assert tesouro.download(client, sleep=waits.append).startswith("Tipo Titulo")
+        assert waits == [5.0, 15.0]
+
+    def test_desiste_na_terceira(self):
+        client = self._client(*[httpx.Response(502)] * 3)
+        with pytest.raises(httpx.HTTPStatusError):
+            tesouro.download(client, sleep=lambda _: None)
+
+    def test_erro_do_pedido_nao_repete(self):
+        client = self._client(httpx.Response(404))
+        with pytest.raises(httpx.HTTPStatusError):
+            tesouro.download(client, sleep=lambda _: pytest.fail("não devia esperar"))
