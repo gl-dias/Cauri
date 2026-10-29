@@ -51,6 +51,14 @@ seed:
     cd backend && uv run cauri-jobs seed-demo
     cd backend && uv run cauri-jobs bootstrap-admin
 
+# Job diário de mercado e snapshots (ex.: just daily --pass second --date 2026-11-03)
+daily *args:
+    cd backend && uv run cauri-jobs daily {{args}}
+
+# Recalcula snapshots de todas as carteiras (ou --user <id> --from AAAA-MM-DD)
+recalc *args:
+    cd backend && uv run cauri-jobs recalc {{args}}
+
 # Histórico de preços e indicadores da união das carteiras (ex.: just backfill --since 2024-01-01)
 backfill *args:
     cd backend && uv run cauri-jobs backfill {{args}}
