@@ -96,6 +96,14 @@ export type MovementRow = {
   created_at?: string;
   voided_at: string | null;
   void_reason?: string | null;
+  // Operação em outra moeda (cripto em USDT, BTC...): valor original e cotação usada.
+  orig_currency?: string | null;
+  orig_value?: number | null;
+  fx_rate?: number | null;
+  fx_date?: string | null;
+  fx_source?: "ptax" | "fechamento" | null;
+  fee_asset?: string | null;
+  fee_quantity?: number | null;
 };
 
 export type LedgerFilter = {

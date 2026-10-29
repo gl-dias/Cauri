@@ -49,3 +49,18 @@ export function describe(m: MovementRow): string {
 export function assetInitials(label: string): string {
   return label.replace(/^(CDB|LCI|LCA)\s.*/, "$1").replace(/^TD-.*/, "TD").slice(0, 4);
 }
+
+/** "200 USDT/un · PTAX de 02/03" ou "0,01 BTC · fechamento de 02/03"; vazio se foi em reais. */
+export function originalText(m: {
+  type: MovementType;
+  orig_currency?: string | null;
+  orig_value?: number | string | null;
+  fx_date?: string | null;
+  fx_source?: string | null;
+}): string {
+  if (!m.orig_currency || m.orig_value === null || m.orig_value === undefined || !m.fx_date) return "";
+  const per = m.type === "compra" || m.type === "venda" ? "/un" : "";
+  const source = m.fx_source === "ptax" ? "PTAX" : "fechamento";
+  const [, month, day] = m.fx_date.split("-");
+  return `${formatQuantity(Number(m.orig_value))} ${m.orig_currency}${per} · ${source} de ${day}/${month}`;
+}

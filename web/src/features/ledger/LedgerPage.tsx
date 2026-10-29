@@ -5,7 +5,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useAppSource, useMovements } from "@/data/context";
 import type { LedgerFilter, MovementRow, MovementType, Origin } from "@/data/types";
 import { formatBRL, formatDate, formatQuantity } from "@/lib/format";
-import { assetInitials, movementValue, originText, ORIGIN_LABEL, TYPE_LABEL } from "@/lib/movements";
+import { assetInitials, movementValue, originalText, originText, ORIGIN_LABEL, TYPE_LABEL } from "@/lib/movements";
 import { tokens, type AssetClassKey } from "@/theme/tokens";
 import { GlassButton, PrimaryButton } from "@/ui/controls";
 import { GlassCard } from "@/ui/GlassCard";
@@ -170,7 +170,10 @@ export function LedgerPage() {
                       </td>
                       <td data-num className="py-2.5 pr-3 text-right">{m.quantity !== null ? formatQuantity(m.quantity) : ""}</td>
                       <td data-num className="py-2.5 pr-3 text-right">{m.unit_price !== null ? formatBRL(m.unit_price) : ""}</td>
-                      <td data-num className="py-2.5 pr-3 text-right font-medium">{valueText(m)}</td>
+                      <td data-num className="py-2.5 pr-3 text-right font-medium">
+                        {valueText(m)}
+                        {originalText(m) ? <div className="text-[11px] font-normal text-muted">{originalText(m)}</div> : null}
+                      </td>
                       <td className="py-2.5 pr-3 whitespace-nowrap text-muted">{m.broker_name}</td>
                       <td className="py-2.5 pr-3"><OriginBadge m={m} /></td>
                       {app ? (
@@ -209,6 +212,7 @@ export function LedgerPage() {
                     </div>
                     <div data-num className="shrink-0 font-semibold">{valueText(m)}</div>
                   </div>
+                  {originalText(m) ? <div data-num className="text-right text-[12px] text-muted">{originalText(m)}</div> : null}
                   {app && !m.voided_at ? (
                     <div className="flex gap-2 pt-1">
                       <GlassButton className="h-9 px-3 text-[13px]" onClick={() => setEditing(m)}><Pencil className="size-3.5" /> Editar</GlassButton>

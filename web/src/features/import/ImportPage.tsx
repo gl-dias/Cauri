@@ -1,20 +1,33 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Download, FileSpreadsheet, History, ShieldCheck, Upload, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Download, FileSpreadsheet, History, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Link } from "react-router";
 
-import { ApiError, type ImportBatch, type ImportCommitOut, type ImportDecision, type ImportPreview, type ImportRow, type ImportRowStatus } from "@/data/api";
-import { useAppSource, useRefreshAfterWrite } from "@/data/context";
+import {
+  ApiError,
+  type ImportBatch,
+  type ImportCommitOut,
+  type ImportDecision,
+  type ImportPreview,
+  type ImportProfile,
+  type ImportRow,
+  type ImportRowStatus,
+  type ProfileField,
+  type ProfileOptions,
+} from "@/data/api";
+import { useAppSource, useBrokers, useRefreshAfterWrite } from "@/data/context";
 import type { AppSource } from "@/data/source";
 import { formatBRL, formatDate, formatQuantity } from "@/lib/format";
-import { INCOME_LABEL, TYPE_LABEL } from "@/lib/movements";
+import { INCOME_LABEL, originalText, TYPE_LABEL } from "@/lib/movements";
 import { GlassButton, PrimaryButton } from "@/ui/controls";
-import { FilterPills, SelectInput } from "@/ui/forms";
+import { Dialog } from "@/ui/Dialog";
+import { Field, FilterPills, SelectInput, TextInput } from "@/ui/forms";
 import { CardHeader, GlassCard } from "@/ui/GlassCard";
 import { pageVariants, staticVariants } from "@/ui/motion";
 
 import { countToImport, initialDecisions } from "./decisions";
+import { FIELDS, guessMapping, missingForProfile } from "./mapping";
 import { SAMPLE_BATCH, SAMPLE_FILENAMES } from "./sample";
 
 const STATUS_LABEL: Record<ImportRowStatus, string> = {
@@ -55,15 +68,15 @@ export function ImportPage() {
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight sm:text-[34px]">Importar</h1>
           <p className="mt-1 text-[14px] text-muted">
-            Exports de Negociação e Movimentação da B3 ou o template do Cauri{app ? "" : " · vitrine no demo"}
+            B3, Binance, os templates do Cauri ou qualquer planilha que você mapear{app ? "" : " · vitrine no demo"}
           </p>
         </div>
         <div className="flex gap-2">
           <a href="/templates/cauri-importacao.xlsx" download className="glass-pill inline-flex h-11 items-center gap-2 px-4 text-[14px] font-medium text-ink hover:bg-white/15">
-            <Download className="size-4" /> Template .xlsx
+            <Download className="size-4" /> Template bolsa
           </a>
-          <a href="/templates/cauri-importacao.csv" download className="glass-pill inline-flex h-11 items-center gap-2 px-4 text-[14px] font-medium text-ink hover:bg-white/15">
-            .csv
+          <a href="/templates/cauri-cripto.xlsx" download className="glass-pill inline-flex h-11 items-center gap-2 px-4 text-[14px] font-medium text-ink hover:bg-white/15">
+            <Download className="size-4" /> Template cripto
           </a>
         </div>
       </header>
@@ -80,8 +93,9 @@ function Showcase() {
     <>
       <GlassCard lift={false}>
         <p className="text-[14px] text-muted">
-          Exemplo de pré-visualização com dados inventados. No app, você arrasta os exports da B3 e o Cauri mostra o que vai
-          entrar, o que já estava lá e o que parece repetido, antes de gravar qualquer coisa.
+          Exemplo de pré-visualização com dados inventados. No app, você arrasta os exports da B3, da Binance ou de
+          qualquer planilha (o formato novo você mapeia uma vez) e o Cauri mostra o que vai entrar, o que já estava lá e o
+          que parece repetido, antes de gravar qualquer coisa. Operações em dólar e stablecoins viram reais pela PTAX.
         </p>
       </GlassCard>
       <PreviewView batch={SAMPLE_BATCH} filenames={SAMPLE_FILENAMES} decisions={decisions} onDecision={(id, d) => setDecisions((s) => ({ ...s, [id]: d }))} />
@@ -155,12 +169,24 @@ function ImportFlow({ app }: { app: AppSource }) {
     const batch = preview.batch;
     const filenames = preview.file_indexes.map((i) => stage.files[i]?.name ?? "");
     const commitError = commit.error instanceof ApiError ? commit.error : null;
+    const unreadable = preview.problems.filter((p) => !p.columns?.length);
+    const unknown = preview.problems.filter((p) => p.columns?.length);
     return (
       <>
-        {preview.problems.length ? (
+        {unknown.map((p) => (
+          <MappingCard
+            key={p.index}
+            app={app}
+            filename={stage.files[p.index]?.name ?? "arquivo"}
+            columns={p.columns ?? []}
+            busy={upload.isPending}
+            onSaved={() => upload.mutate(stage.files)}
+          />
+        ))}
+        {unreadable.length ? (
           <GlassCard lift={false} className="space-y-2">
             <CardHeader title="Arquivos que não entraram" />
-            {preview.problems.map((p) => (
+            {unreadable.map((p) => (
               <p key={p.index} className="text-[14px]">
                 <span className="font-medium">{stage.files[p.index]?.name}</span>
                 <span className="text-muted">: {p.message}</span>
@@ -227,8 +253,194 @@ function ImportFlow({ app }: { app: AppSource }) {
             </p>
           )}
         </GlassCard>
+        <ProfilesCard app={app} />
+        <GlassCard lift={false}>
+          <CardHeader title="Templates" subtitle="Para corretoras e exchanges que o Cauri não lê direto" />
+          <ul className="space-y-2 text-[14px]">
+            {[
+              { name: "Bolsa, Tesouro e renda fixa", file: "cauri-importacao" },
+              { name: "Cripto", file: "cauri-cripto" },
+            ].map((t) => (
+              <li key={t.file} className="glass-inset flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <span>{t.name}</span>
+                <span className="flex gap-3 text-[13px] font-medium">
+                  <a href={`/templates/${t.file}.xlsx`} download className="underline underline-offset-2">.xlsx</a>
+                  <a href={`/templates/${t.file}.csv`} download className="underline underline-offset-2">.csv</a>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </GlassCard>
       </div>
     </div>
+  );
+}
+
+/* Perfis de importação: mapeamento de colunas de arquivos desconhecidos ---------------- */
+
+function ProfilesCard({ app }: { app: AppSource }) {
+  const client = useQueryClient();
+  const profiles = useQuery({ queryKey: ["app", "import-profiles"], queryFn: () => app.api.imports.profiles.list() });
+  const [removing, setRemoving] = useState<ImportProfile | null>(null);
+  const remove = useMutation({
+    mutationFn: (id: string) => app.api.imports.profiles.remove(id),
+    onSuccess: async () => {
+      setRemoving(null);
+      await client.invalidateQueries({ queryKey: ["app", "import-profiles"] });
+    },
+  });
+  if (!profiles.data?.length) return null;
+  return (
+    <GlassCard lift={false}>
+      <CardHeader title="Perfis de importação" subtitle="Arquivos que você mapeou, reconhecidos pelo cabeçalho" />
+      <ul className="space-y-2">
+        {profiles.data.map((p) => (
+          <li key={p.id} className="glass-inset flex items-center gap-3 px-3.5 py-2.5 text-[13px]">
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{p.name}</div>
+              <div className="text-muted">
+                {Object.keys(p.mapping).length} colunas
+                {p.last_used_at ? ` · usado em ${formatDate(p.last_used_at.slice(0, 10))}` : ""}
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label={`Apagar o perfil ${p.name}`}
+              onClick={() => setRemoving(p)}
+              className="grid size-8 place-items-center rounded-full text-muted hover:bg-loss/15 hover:text-loss"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        title="Apagar perfil"
+        footer={
+          <>
+            <GlassButton onClick={() => setRemoving(null)}>Cancelar</GlassButton>
+            <PrimaryButton disabled={remove.isPending} onClick={() => removing && remove.mutate(removing.id)}>
+              Apagar
+            </PrimaryButton>
+          </>
+        }
+      >
+        <p className="text-[14px] text-muted">
+          O perfil <span className="font-medium text-ink">{removing?.name}</span> deixa de reconhecer o arquivo. O que já foi
+          importado com ele continua no ledger.
+        </p>
+      </Dialog>
+    </GlassCard>
+  );
+}
+
+function MappingCard({ app, filename, columns, busy, onSaved }: {
+  app: AppSource;
+  filename: string;
+  columns: string[];
+  busy: boolean;
+  onSaved: () => void;
+}) {
+  const client = useQueryClient();
+  const brokers = useBrokers();
+  const [mapping, setMapping] = useState<Partial<Record<ProfileField, string>>>(() => guessMapping(columns));
+  const [brokerId, setBrokerId] = useState("");
+  const [name, setName] = useState("");
+  const [dateFormat, setDateFormat] = useState<NonNullable<ProfileOptions["date_format"]>>("dd/mm/aaaa");
+  const [decimal, setDecimal] = useState<NonNullable<ProfileOptions["decimal"]>>(",");
+  const [currency, setCurrency] = useState("BRL");
+  const missing = missingForProfile(mapping, brokerId, name);
+  const save = useMutation({
+    mutationFn: () =>
+      app.api.imports.profiles.save(name.trim(), mapping, {
+        ...(brokerId ? { broker_id: brokerId } : {}),
+        decimal,
+        date_format: dateFormat,
+        currency,
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["app", "import-profiles"] });
+      onSaved();
+    },
+  });
+  const id = (key: string) => `map-${filename}-${key}`.replace(/[^\w-]/g, "-");
+  return (
+    <GlassCard lift={false} className="space-y-5">
+      <CardHeader
+        title={`Formato novo: ${filename}`}
+        subtitle="Diga qual coluna do arquivo é cada campo. O perfil fica salvo e reconhece esse formato sozinho nas próximas vezes."
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {FIELDS.map((f) => (
+          <Field key={f.key} label={`${f.label}${f.required ? " *" : ""}`} hint={f.hint} htmlFor={id(f.key)}>
+            <SelectInput
+              id={id(f.key)}
+              value={mapping[f.key] ?? ""}
+              onChange={(e) => setMapping((m) => ({ ...m, [f.key]: e.target.value || undefined }))}
+            >
+              <option value="">Não usar</option>
+              {columns.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </SelectInput>
+          </Field>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Corretora fixa" hint="se o arquivo não tem a coluna" htmlFor={id("broker")}>
+          <SelectInput id={id("broker")} value={brokerId} onChange={(e) => {
+            setBrokerId(e.target.value);
+            const chosen = brokers.data?.find((b) => b.id === e.target.value);
+            if (chosen && !name) setName(chosen.name);
+          }}>
+            <option value="">Nenhuma</option>
+            {brokers.data?.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field label="Formato da data" htmlFor={id("date")}>
+          <SelectInput id={id("date")} value={dateFormat} onChange={(e) => setDateFormat(e.target.value as typeof dateFormat)}>
+            <option value="dd/mm/aaaa">dd/mm/aaaa</option>
+            <option value="aaaa-mm-dd">aaaa-mm-dd</option>
+            <option value="mm/dd/aaaa">mm/dd/aaaa</option>
+          </SelectInput>
+        </Field>
+        <Field label="Números" htmlFor={id("decimal")}>
+          <SelectInput id={id("decimal")} value={decimal} onChange={(e) => setDecimal(e.target.value as typeof decimal)}>
+            <option value=",">1.234,56 (vírgula)</option>
+            <option value=".">1,234.56 (ponto)</option>
+          </SelectInput>
+        </Field>
+        <Field label="Moeda padrão do preço" htmlFor={id("currency")}>
+          <SelectInput id={id("currency")} value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            {["BRL", "USD", "USDT", "USDC"].map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </SelectInput>
+        </Field>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <Field label="Nome do perfil" htmlFor={id("name")}>
+            <TextInput id={id("name")} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Corretora X" maxLength={80} />
+          </Field>
+        </div>
+        <PrimaryButton disabled={missing.length > 0 || save.isPending || busy} onClick={() => save.mutate()} className="disabled:cursor-not-allowed disabled:opacity-60">
+          {save.isPending || busy ? "Salvando..." : "Salvar perfil e pré-visualizar"}
+        </PrimaryButton>
+      </div>
+      {missing.length ? <p className="text-[13px] text-muted">Falta: {missing.join(", ")}.</p> : null}
+      {save.error ? (
+        <p role="alert" className="text-[13px] text-loss">{save.error instanceof ApiError ? save.error.message : "Sem conexão com a API."}</p>
+      ) : null}
+      <p className="flex items-start gap-2 text-[13px] text-muted">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+        O perfil guarda só os nomes das colunas e estas opções. Nada do conteúdo do arquivo.
+      </p>
+    </GlassCard>
   );
 }
 
@@ -390,6 +602,7 @@ function FileSection({ title, subtitle, rows, filter, decisions, onDecision }: {
                 <span data-num className="shrink-0 font-semibold">{valueOf(r)}</span>
               </div>
             ) : null}
+            {r.draft && originalText(r.draft) ? <div data-num className="text-right text-[12px] text-muted">{originalText(r.draft)}</div> : null}
             <Messages row={r} />
             {r.status === "possible_duplicate" ? <DecisionSelect row={r} value={decisions[r.id]} onChange={onDecision} /> : null}
           </li>
@@ -416,7 +629,10 @@ function RowLines({ row, decision, onDecision }: { row: ImportRow; decision?: Im
         <td className="py-2.5 pr-3 whitespace-nowrap">{kindOf(row)}</td>
         <td className="max-w-[220px] truncate py-2.5 pr-3 font-medium">{assetOf(row)}</td>
         <td data-num className="py-2.5 pr-3 text-right">{d?.quantity ? formatQuantity(Number(d.quantity)) : ""}</td>
-        <td data-num className="py-2.5 pr-3 text-right font-medium">{valueOf(row)}</td>
+        <td data-num className="py-2.5 pr-3 text-right font-medium">
+          {valueOf(row)}
+          {d && originalText(d) ? <div className="text-[11px] font-normal text-muted">{originalText(d)}</div> : null}
+        </td>
         <td className="py-2.5 pr-3 whitespace-nowrap text-muted">{d?.broker_name ?? row.raw.corretora ?? row.raw.instituicao ?? ""}</td>
       </tr>
       {hasDetail ? (

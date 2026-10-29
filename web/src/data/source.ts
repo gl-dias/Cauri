@@ -88,7 +88,7 @@ async function rows<T>(query: PromiseLike<Result<T>>): Promise<T[]> {
 }
 
 const MOVEMENT_COLUMNS =
-  "id, trade_date, type, income_kind, asset_class, asset_id, instrument_id, asset_label, asset_name, quantity, unit_price, fees, amount, factor, fi_rate_pct, fi_maturity_date, broker_id, broker_name, origin, origin_label, notes, created_at, voided_at, void_reason";
+  "id, trade_date, type, income_kind, asset_class, asset_id, instrument_id, asset_label, asset_name, quantity, unit_price, fees, amount, factor, fi_rate_pct, fi_maturity_date, broker_id, broker_name, origin, origin_label, notes, created_at, voided_at, void_reason, orig_currency, orig_value, fx_rate, fx_date, fx_source, fee_asset, fee_quantity";
 
 function reader(client: MartsClient, mode: "demo" | "app"): PortfolioReader {
   return {

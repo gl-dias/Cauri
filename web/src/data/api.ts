@@ -56,6 +56,13 @@ export type ImportDraft = {
   amount: string | null;
   factor: string | null;
   income_kind: "dividendo" | "jcp" | "rendimento" | "juros" | null;
+  orig_currency?: string | null;
+  orig_value?: string | null;
+  fx_rate?: string | null;
+  fx_date?: string | null;
+  fx_source?: "ptax" | "fechamento" | null;
+  fee_asset?: string | null;
+  fee_quantity?: string | null;
 };
 export type ImportRow = {
   id: string;
@@ -78,7 +85,18 @@ export type ImportBatch = {
   files: ImportFile[];
   counts: Partial<Record<ImportRowStatus, number>>;
 };
-export type ImportPreview = { batch: ImportBatch | null; problems: { index: number; message: string }[]; file_indexes: number[] };
+export type ImportProblem = { index: number; message: string; columns?: string[] };
+export type ImportPreview = { batch: ImportBatch | null; problems: ImportProblem[]; file_indexes: number[] };
+export type ProfileField = "data" | "tipo" | "ativo" | "quantidade" | "preco" | "valor" | "taxa" | "ativo_taxa" | "moeda" | "corretora" | "obs";
+export type ProfileOptions = { broker_id?: string; decimal?: "," | "."; date_format?: "dd/mm/aaaa" | "aaaa-mm-dd" | "mm/dd/aaaa"; currency?: string };
+export type ImportProfile = {
+  id: string;
+  name: string;
+  mapping: Partial<Record<ProfileField, string>>;
+  options: ProfileOptions;
+  created_at: string;
+  last_used_at: string | null;
+};
 export type ImportSummary = { id: string; status: ImportBatch["status"]; created_at: string; finished_at: string | null; labels: string[]; imported: number };
 export type ImportCommitOut = { created: number; already_imported: number; replaced: number; skipped: number; snapshots_updated: boolean };
 
@@ -132,6 +150,12 @@ export function createApi(baseUrl: string, token: () => Promise<string | null>) 
       commit: (id: string, decisions: Record<string, ImportDecision>) =>
         call<ImportCommitOut>("POST", `/v1/imports/${id}/commit`, { decisions }),
       discard: (id: string) => call<void>("POST", `/v1/imports/${id}/discard`),
+      profiles: {
+        list: () => call<ImportProfile[]>("GET", "/v1/imports/profiles"),
+        save: (name: string, mapping: Partial<Record<ProfileField, string>>, options: ProfileOptions) =>
+          call<ImportProfile>("POST", "/v1/imports/profiles", { name, mapping, options }),
+        remove: (id: string) => call<void>("DELETE", `/v1/imports/profiles/${id}`),
+      },
     },
     allowlist: {
       list: () => call<AllowlistEntry[]>("GET", "/v1/admin/allowlist"),

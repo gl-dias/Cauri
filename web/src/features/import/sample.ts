@@ -61,6 +61,40 @@ const movimentacao: ImportRow[] = [
   }),
 ];
 
+const binance: ImportRow[] = [
+  row({
+    status: "ok",
+    draft: draft({
+      trade_date: "2026-09-18", type: "compra", asset_label: "BTC", quantity: "0.0019", unit_price: "593536.368",
+      fees: "0.36", broker_id: "binance", broker_name: "Binance",
+      orig_currency: "USDT", orig_value: "111120", fx_rate: "5.3414", fx_date: "2026-09-18", fx_source: "ptax",
+      fee_asset: "BNB", fee_quantity: "0.0001",
+    }),
+    messages: [
+      { level: "info", text: "Convertido de 111120 USDT pela PTAX de venda de 18/09/2026 (R$ 5,3414)." },
+      { level: "info", text: "Taxa de 0,0001 BNB = R$ 0,36 pelo fechamento do BNB de 18/09/2026, somada ao custo." },
+    ],
+  }),
+  row({
+    status: "ok",
+    draft: draft({
+      trade_date: "2026-09-18", type: "venda", asset_label: "USDT", quantity: "211.128", unit_price: "5.3414",
+      broker_id: "binance", broker_name: "Binance",
+      orig_currency: "USDT", orig_value: "1", fx_rate: "5.3414", fx_date: "2026-09-18", fx_source: "ptax",
+    }),
+    messages: [{ level: "info", text: "Contrapartida: 211.128 USDT pagos na compra de BTC." }],
+  }),
+  row({
+    status: "ok",
+    draft: draft({
+      trade_date: "2026-09-20", type: "provento", asset_label: "ETH", amount: "1.62", income_kind: "rendimento",
+      broker_id: "binance", broker_name: "Binance",
+      orig_currency: "ETH", orig_value: "0.0001", fx_rate: "16200", fx_date: "2026-09-19", fx_source: "fechamento",
+    }),
+    messages: [{ level: "info", text: "Simple Earn Flexible Interest: entra como provento pelo valor do dia." }],
+  }),
+];
+
 export const SAMPLE_BATCH: ImportBatch = {
   id: "00000000-0000-4000-8000-0000000000b1",
   status: "preview",
@@ -70,11 +104,12 @@ export const SAMPLE_BATCH: ImportBatch = {
   files: [
     { id: "00000000-0000-4000-8000-0000000000f1", label: "B3 · Negociação, 08/2026 a 09/2026", adapter: "b3-negociacao", rows: negociacao, counts: countOf(negociacao) },
     { id: "00000000-0000-4000-8000-0000000000f2", label: "B3 · Movimentação, 09/2026 a 09/2026", adapter: "b3-movimentacao", rows: movimentacao, counts: countOf(movimentacao) },
+    { id: "00000000-0000-4000-8000-0000000000f3", label: "Binance · Trades (Spot), 09/2026 a 09/2026", adapter: "binance-trades", rows: binance, counts: countOf(binance) },
   ],
-  counts: countOf([...negociacao, ...movimentacao]),
+  counts: countOf([...negociacao, ...movimentacao, ...binance]),
 };
 
-export const SAMPLE_FILENAMES = ["negociacao-2026-10-28.xlsx", "movimentacao-2026-10-28.xlsx"];
+export const SAMPLE_FILENAMES = ["negociacao-2026-10-28.xlsx", "movimentacao-2026-10-28.xlsx", "binance-trades.csv"];
 
 function countOf(rows: ImportRow[]): ImportBatch["counts"] {
   const out: ImportBatch["counts"] = {};
