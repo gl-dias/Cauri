@@ -48,26 +48,16 @@ pelo Certbot. A imagem é a mesma que rodaria no Cloud Run (ver `backend/apps/ap
 5. Nginx e TLS: use `nginx/cauri-api.conf` como base (instruções no próprio arquivo)
    e rode `sudo certbot --nginx -d api.SEU-DOMINIO`.
 
-## Deploy automático (Fase 6)
+## Deploy automático
 
-O workflow de deploy entra na Fase 6. O fluxo vai ser:
+`.github/workflows/deploy-api.yml`: push na `main` que mexe no `backend/` (ou Run workflow)
+builda a imagem, publica em `ghcr.io/gl-dias/cauri-api:<sha>` e `:latest`, e por SSH (chave
+dedicada, secrets `VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`)
+atualiza o `CAURI_API_TAG` do `.env`, faz `docker compose pull` e `up -d`. O token do
+próprio job autentica a VPS no GHCR durante o deploy e expira com ele, então a imagem pode
+ficar privada. No fim, confere `GET $API_URL/health`.
 
-1. Merge na `main` dispara o GitHub Actions (com aprovação manual no environment
-   `production`).
-2. O Actions builda a imagem com `backend/` como contexto e faz push para
-   `ghcr.io/<owner>/cauri-api:<sha>` e `:latest`.
-3. Por SSH, com uma chave dedicada só ao deploy (`VPS_HOST`, `VPS_USER`,
-   `VPS_SSH_KEY` nos secrets), roda na VPS:
+## Backup
 
-   ```bash
-   cd /opt/cauri && CAURI_API_TAG=<sha> docker compose pull && CAURI_API_TAG=<sha> docker compose up -d
-   ```
-
-Para voltar uma versão, rode o mesmo comando com o SHA anterior.
-
-## Operação
-
-- Logs: `docker compose logs -f api` (rotação de 5 arquivos de 10 MB).
-- Reiniciar: `docker compose restart api`.
-- O container roda com usuário sem privilégio, sistema de arquivos só leitura e
-  porta presa em `127.0.0.1`.
+`docs/backup.md`: dump semanal dos schemas de dados para `/opt/cauri/backups`, retenção de
+8 semanas e o teste de restauração.
