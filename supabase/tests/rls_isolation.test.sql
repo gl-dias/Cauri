@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(37);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -149,6 +149,12 @@ select is((select count(*)::int from engine.bucket_snapshots where user_id <> ap
   'anon não vê snapshot por classe de carteira real');
 select ok((select count(*) from market.indicators) > 0, 'anon lê indicadores públicos');
 select is((select display_name from marts.me), 'Investidor Demo', 'marts.me do anon é o perfil demo');
+select is((select count(*)::int from marts.portfolio_daily where user_id <> app.demo_user_id()), 0,
+  'marts.portfolio_daily do anon não tem carteira real');
+select is((select count(*)::int from marts.buckets_daily where user_id <> app.demo_user_id()), 0,
+  'marts.buckets_daily do anon não tem carteira real');
+select is((select count(*)::int from marts.positions_current where user_id <> app.demo_user_id()), 0,
+  'marts.positions_current do anon não tem carteira real');
 select throws_ok($$select count(*) from app.allowlist$$, '42501', null, 'anon não lê a allowlist');
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
