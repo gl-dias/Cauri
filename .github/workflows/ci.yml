@@ -94,4 +94,68 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
-  # O job do frontend (tsc, vitest, vite build e screenshots do Playwright) entra na Fase 3.
+  web:
+    name: Front (tipos, testes e build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instala
+        run: npm ci
+
+      - name: Tipos (TypeScript)
+        run: npm run typecheck
+
+      - name: Testes (Vitest)
+        run: npm test
+
+      - name: Build
+        run: npx vite build
+
+  # Trava de interface: contraste WCAG AA de todo texto visível sobre o vidro e nenhuma
+  # rolagem horizontal, no desktop e no celular. Backend simulado com as fixtures do demo
+  # (e2e/fixtures), então não precisa de banco.
+  interface:
+    name: Interface (contraste AA e layout)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      CAURI_SHOTS_DIR: ${{ runner.temp }}/interface
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instala
+        run: npm ci
+
+      - name: Navegador do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Contraste e layout
+        run: npx playwright test
+
+      - name: Relatórios (quando falha)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: interface
+          path: ${{ runner.temp }}/interface
+          retention-days: 7
