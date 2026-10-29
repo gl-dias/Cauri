@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(47);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -65,6 +65,15 @@ values
 
 insert into ops.job_runs (job, trigger, status) values ('daily', 'cron', 'ok');
 
+insert into imports.batches (id, user_id) values
+  ('20000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000a');
+insert into imports.files (id, batch_id, user_id, position, label, sha256, size_bytes, adapter, adapter_version)
+values ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001',
+        '00000000-0000-4000-8000-00000000000a', 0, 'Template do Cauri', repeat('a', 64), 10, 'planilha', 1);
+insert into imports.rows (file_id, user_id, position, line_numbers, raw, status)
+values ('20000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a', 0, '{2}',
+        '{"ativo": "AAAA3"}', 'error');
+
 -- ana (membro, admin) ---------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -82,6 +91,9 @@ select is((select role from marts.me), 'admin', 'marts.me da ana diz admin');
 select ok((select count(*) from marts.job_runs) >= 1, 'admin lê o log de jobs pela view');
 select is((select count(*)::int from market.assets where ticker in ('AAAA3', 'BBBB4', 'DDDD3')), 3,
   'membro lê todos os ativos');
+select is((select count(*)::int from imports.rows), 1, 'ana vê as linhas da própria importação');
+select throws_ok($$delete from imports.batches$$, '42501', null,
+  'ninguém apaga lote de importação (descartar é mudar o status)');
 
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
@@ -110,6 +122,11 @@ select throws_ok(
   '42501', null, 'usuário comum não adiciona e-mail na allowlist');
 select is((select count(*)::int from ops.job_runs), 0, 'usuário comum não lê o log de jobs');
 select is((select count(*)::int from marts.job_runs), 0, 'usuário comum não lê o log de jobs pela view');
+select is((select count(*)::int from imports.batches) + (select count(*)::int from imports.rows), 0,
+  'bruno não vê a importação da ana');
+select throws_ok(
+  $$insert into imports.batches (user_id) values ('00000000-0000-4000-8000-00000000000a')$$,
+  '42501', null, 'bruno não cria lote de importação em nome da ana');
 
 reset role;
 
@@ -120,6 +137,9 @@ select set_config('request.jwt.claims',
 
 select is((select count(*)::int from ledger.movements), 0, 'quem saiu da allowlist perde acesso na hora');
 select is((select count(*)::int from market.assets), 0, 'quem saiu da allowlist não lê mercado');
+select throws_ok(
+  $$insert into imports.batches (user_id) values ('00000000-0000-4000-8000-00000000000c')$$,
+  '42501', null, 'quem saiu da allowlist não importa');
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
     values ('00000000-0000-4000-8000-00000000000c', date '2026-03-01', '10000000-0000-4000-8000-000000000002',
@@ -161,6 +181,7 @@ select is((select count(*)::int from marts.positions_current where user_id <> ap
   'marts.positions_current do anon não tem carteira real');
 select throws_ok($$select count(*) from app.allowlist$$, '42501', null, 'anon não lê a allowlist');
 select throws_ok($$select count(*) from marts.job_runs$$, '42501', null, 'anon não lê o log de jobs');
+select throws_ok($$select count(*) from imports.rows$$, '42501', null, 'anon não alcança as importações');
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
     values ('00000000-0000-4000-8000-0000000000dd', date '2026-03-02', '10000000-0000-4000-8000-000000000004',
@@ -168,6 +189,13 @@ select throws_ok(
   '42501', null, 'anon não grava nada, nem no demo');
 
 reset role;
+
+-- Defesa no banco: CPF formatado não entra no raw de uma linha importada.
+select throws_ok(
+  $$insert into imports.rows (file_id, user_id, position, line_numbers, raw, status)
+    values ('20000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a', 1, '{3}',
+            '{"obs": "cpf 123.456.789-00"}', 'error')$$,
+  '23514', null, 'CPF no raw de uma linha importada é recusado pelo banco');
 
 -- cauri_ingest (job) ----------------------------------------------------------------
 -- O postgres criou o role (tem ADMIN OPTION), mas precisa da associação para assumir.
