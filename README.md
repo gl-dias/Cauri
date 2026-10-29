@@ -3,7 +3,7 @@
 Portal de investimentos que junta ações, FIIs, Tesouro Direto, renda fixa e cripto numa carteira só e compara a rentabilidade com o CDI.
 As operações entram pela planilha da corretora ou por uma frase falada ("comprei 3 petrobras"), e nada é gravado sem você conferir antes.
 
-### [Abrir a demo ao vivo →](https://cauri.pages.dev/demo)
+### Demo ao vivo: _o link entra assim que o Pages estiver no ar_
 
 Sem login: uma carteira fictícia com preços reais de mercado, atualizados todo dia útil.
 

@@ -96,7 +96,7 @@ Preencha com os dados do Supabase de produção (modelo completo na seção API 
 ```dotenv
 CAURI_DATABASE_URL=postgresql://cauri_api.<ref>:<senha-do-cauri_api>@<host-do-pooler>:6543/postgres
 CAURI_SUPABASE_URL=https://<ref>.supabase.co
-CAURI_CORS_ORIGINS=["https://cauri.pages.dev"]
+CAURI_CORS_ORIGINS=["https://<dominio-do-pages>"]
 ANTHROPIC_API_KEY=<chave-da-anthropic>
 GROQ_API_KEY=<chave-do-groq, opcional: sem ela o navegador transcreve>
 CAURI_ASSISTANT_DAILY_LIMIT=50

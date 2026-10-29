@@ -4,7 +4,7 @@ Roteiro para subir o Cauri do zero. O que precisa de conta ou de chave é feito 
 nos painéis; o resto é workflow do GitHub. Nenhuma chave passa pelo chat nem entra no repo.
 
 ```
-Cloudflare Pages (cauri.pages.dev)  ──►  Supabase sa-east-1 (Postgres, Auth, PostgREST)
+Cloudflare Pages (<dominio-do-pages>) ──►  Supabase sa-east-1 (Postgres, Auth, PostgREST)
         │                                      ▲
         └──►  API na VPS (<api.seu-dominio>) ──┘   GitHub Actions: migrations, deploy da API,
               Nginx + Certbot, Docker                  job diário, monitoramento
@@ -16,11 +16,16 @@ Fora as chaves e senhas (que só vão para os painéis e secrets), são estes:
 
 | Valor | Exemplo | Onde entra |
 |---|---|---|
-| domínio do Pages | `cauri.pages.dev` (definido) | Auth do Supabase (1.5), CORS no `api.env` da VPS |
+| `<dominio-do-pages>` | `cauri-abc.pages.dev` ou `cauri.seu-dominio` | Auth do Supabase (1.5), CORS no `api.env` da VPS |
 | `<ref>` do Supabase | `abcdefghijklmnopqrst` | `VITE_SUPABASE_URL` (Pages), `CAURI_SUPABASE_URL` e conexões |
 | `<host-do-pooler>` | `aws-0-sa-east-1.pooler.supabase.com` | todas as conexões com o banco |
 | `<api.seu-dominio>` | `api.exemplo.com.br` | Nginx e Certbot, `VITE_API_URL` (Pages), variável `API_URL` (GitHub) |
 | `<dominio-do-email>` | `mail.exemplo.com.br` | Resend (2) e remetente do SMTP (1.7) |
+
+**Atenção ao domínio do Pages:** `cauri.pages.dev` pertence a outro projeto (de terceiros),
+então o Cloudflare dá ao nosso um endereço com sufixo. Use exatamente o que aparece no
+painel (Workers & Pages, projeto `cauri`) ou um domínio próprio, e nunca `cauri.pages.dev`:
+nas Redirect URLs do Supabase, ele mandaria o token do magic link para o site de outra pessoa.
 
 Nenhum deles fica no código: o build do Pages monta a CSP com as variáveis `VITE_*`, e o
 Nginx recebe o subdomínio por `sed` na instalação.
@@ -47,8 +52,8 @@ Nginx recebe o subdomínio por `sed` na instalação.
    - jobs: `postgresql://cauri_ingest.<ref>:<senha-2>@<host-do-pooler>:6543/postgres`
    - dono (migrations, preparação, backup): porta **5432** (modo sessão), usuário `postgres.<ref>`.
 5. **Auth, URL Configuration:**
-   - Site URL: `https://cauri.pages.dev/app`
-   - Redirect URLs: `https://cauri.pages.dev/**`
+   - Site URL: `https://<dominio-do-pages>/app`
+   - Redirect URLs: `https://<dominio-do-pages>/**` (só esse; nada de curinga em `*.pages.dev`)
 6. **Auth, Hooks:** ative *Before User Created* apontando para a função Postgres
    `app.hook_before_user_created` (a allowlist). Sem isso, qualquer e-mail cria conta.
 7. **Auth, SMTP próprio** (o padrão do Supabase manda poucos e-mails por hora e não serve
@@ -87,7 +92,7 @@ Passo a passo com os comandos em `deploy/vps/README.md`:
 2. Na VPS: usuário `cauri-deploy` sem senha, no grupo `docker`, com a chave presa a um único
    comando (`/usr/local/bin/cauri-deploy`); `/opt/cauri` com os segredos em `api.env`.
 3. `api.env` com a conexão do `cauri_api`, a URL do Supabase, o CORS só para
-   `https://cauri.pages.dev` e as chaves da Anthropic e da Groq.
+   `https://<dominio-do-pages>` e as chaves da Anthropic e da Groq.
 4. Nginx com o subdomínio e `certbot --nginx`.
 5. Backup: `docs/backup.md`.
 
