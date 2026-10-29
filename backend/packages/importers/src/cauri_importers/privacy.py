@@ -11,8 +11,10 @@ from __future__ import annotations
 import re
 import unicodedata
 
-_CPF = re.compile(r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}")
-_LONG_DIGITS = re.compile(r"\d{11,}")
+# CPF com hífen (123.456.789-00 ou 123456789-00), ou 11 dígitos ou mais seguidos que não
+# são parte de um número decimal: "100.00000000USDT" e "0,00012345678901" não são CPF.
+_CPF = re.compile(r"\d{3}\.?\d{3}\.?\d{3}-\d{2}")
+_LONG_DIGITS = re.compile(r"(?<![\d.,])\d{11,}(?![\d.,]*\d)")
 MASK = "***"
 
 

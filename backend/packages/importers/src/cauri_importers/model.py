@@ -16,7 +16,8 @@ from typing import Protocol
 from cauri_core import IncomeKind, MovementType
 from cauri_ledger import FixedIncomeDraft
 
-# Célula já convertida: texto, número (sempre Decimal, nunca float), data ou vazia.
+# Célula já convertida: texto, número (sempre Decimal, nunca float), data (ou data e hora,
+# que é subclasse de date) ou vazia.
 Cell = str | Decimal | date | None
 
 
@@ -57,6 +58,15 @@ class Item:
     notes: str | None = None
     # Eventos da B3 trazem as ações recebidas, não o fator: o fator sai da posição na data.
     credited: Decimal | None = None
+    # Moeda de unit_price, amount e fees ("BRL", "USD", "USDT", "BTC"...). Fora do real, o
+    # serviço converte pela PTAX de venda (dólar e stablecoins) ou pelo fechamento do dia.
+    currency: str = "BRL"
+    # Taxa paga num ativo diferente da moeda (0,0001 BNB): convertida e somada em fees.
+    fee_asset: str | None = None
+    fee_quantity: Decimal | None = None
+    # Taxa como foi paga, quando já está em fees pela cotação (0,0005 BTC numa compra de BTC
+    # em USDT entra em fees como 0,1 USDT). Só para registro no movimento.
+    fee_paid: tuple[str, Decimal] | None = None
 
 
 @dataclass(frozen=True, slots=True)

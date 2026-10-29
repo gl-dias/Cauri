@@ -1,0 +1,4 @@
+data;tipo;ativo;quantidade;preco;moeda do preco;taxa;ativo da taxa;exchange;obs
+02/03/2011;compra;TSTCOIN;0,5;200;USDT;0,1;TSTFEE;Binance;
+04/03/2011;venda;TSTCOIN;0,1;380;BRL;1,00;BRL;Binance;
+04/03/2011;recompensa;TSTCOIN;0,01;;;;;Binance;staking

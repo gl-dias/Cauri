@@ -12,7 +12,7 @@ import re
 import zipfile
 from collections.abc import Generator, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import PurePath
 
@@ -28,6 +28,15 @@ _NUMERIC_TEXT = re.compile(r"^-?[\d.,]+$")
 
 class FileError(ValueError):
     """Arquivo que não dá para ler. A mensagem vai direto para a tela."""
+
+
+class UnknownFormatError(FileError):
+    """Arquivo legível, mas de formato desconhecido. Leva os nomes das colunas do cabeçalho
+    provável, para o usuário mapear (só os nomes: nenhum valor do arquivo)."""
+
+    def __init__(self, message: str, columns: list[str]) -> None:
+        super().__init__(message)
+        self.columns = columns
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,23 +60,35 @@ def read(filename: str, content: bytes, adapters: Sequence[Adapter]) -> Detected
     else:
         raise FileError("Formato não suportado. Envie .xlsx ou .csv.")
 
+    best_header: list[str] = []
     try:
         for rows in sheets:
             detected = _detect(rows, adapters)
-            if detected is not None:
+            if isinstance(detected, Detected):
                 return detected
+            if len(detected) > len(best_header):
+                best_header = detected
     finally:
         sheets.close()  # fecha a planilha mesmo se der erro no meio
-    raise FileError(
-        "Não reconheci o formato deste arquivo. Use os exports de Negociação e Movimentação "
-        "da Área do Investidor da B3 ou o template do Cauri."
+    raise UnknownFormatError(
+        "Não reconheci o formato deste arquivo. Associe as colunas aos campos do Cauri e "
+        "salve um perfil: da próxima vez ele é reconhecido sozinho.",
+        best_header,
     )
 
 
-def _detect(rows: Iterator[tuple[int, list[Cell]]], adapters: Sequence[Adapter]) -> Detected | None:
+def _detect(
+    rows: Iterator[tuple[int, list[Cell]]], adapters: Sequence[Adapter]
+) -> Detected | list[str]:
+    """O adaptador e as linhas, ou (sem adaptador) o cabeçalho provável: a linha do início
+    com mais células de texto e nenhum número ou data, que é onde ficam os nomes."""
     scanned: list[tuple[int, list[Cell]]] = []
+    guess: list[str] = []
     for number, cells in rows:
         scanned.append((number, cells))
+        texts = [c.strip() for c in cells if isinstance(c, str) and c.strip()]
+        if len(texts) > len(guess) and not any(isinstance(c, Decimal | date) for c in cells):
+            guess = [scrub(t)[:80] for t in texts][:60]
         header = [normalize(c) if isinstance(c, str) else "" for c in cells]
         best: tuple[Adapter, dict[int, str]] | None = None
         for adapter in adapters:
@@ -80,8 +101,8 @@ def _detect(rows: Iterator[tuple[int, list[Cell]]], adapters: Sequence[Adapter])
             adapter, mapping = best
             return Detected(adapter=adapter, rows=_body(rows, mapping))
         if len(scanned) >= HEADER_SCAN:
-            return None
-    return None
+            return guess
+    return guess
 
 
 def _match(header: list[str], adapter: Adapter) -> dict[int, str]:
@@ -126,6 +147,8 @@ def as_text(value: Cell) -> str:
     """Forma textual de uma célula, para guardar no ``raw`` da linha."""
     if value is None:
         return ""
+    if isinstance(value, datetime):
+        return f"{value:%d/%m/%Y %H:%M:%S}" if value.time() != time() else f"{value:%d/%m/%Y}"
     if isinstance(value, date):
         return f"{value:%d/%m/%Y}"
     return str(value)
@@ -163,10 +186,8 @@ def _xlsx_cell(value: object) -> Cell:
         return value
     if isinstance(value, bool):
         return str(value)
-    if isinstance(value, datetime):
-        return value.date()
     if isinstance(value, date):
-        return value
+        return value  # datetime também: a hora importa nos exports em UTC (Binance)
     if isinstance(value, int):
         return Decimal(value)
     if isinstance(value, float):

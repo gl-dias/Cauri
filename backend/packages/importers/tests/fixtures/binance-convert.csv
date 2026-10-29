@@ -1,0 +1,3 @@
+Date;Wallet;Pair;Type;Sell;Buy;Price;Inverse Price;Date Updated;Status
+2011-03-03 12:00:00;Spot;TSTCOIN/USDT;Market;40 USDT;0.2 TSTCOIN;200;0.005;2011-03-03 12:00:00;Successful
+2011-03-03 12:05:00;Spot;TSTCOIN/USDT;Market;10 USDT;0.05 TSTCOIN;200;0.005;2011-03-03 12:05:00;Failed

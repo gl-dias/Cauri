@@ -25,7 +25,8 @@ from uuid import UUID, uuid4
 from cauri_core import CORPORATE_EVENTS, Movement, MovementType, Origin
 from cauri_engine.calc import replay
 from cauri_importers import brokers as broker_names
-from cauri_importers import drafts, registry
+from cauri_importers import drafts, fx, registry
+from cauri_importers.adapters.mapped import MappedAdapter
 from cauri_importers.model import (
     Adapter,
     Item,
@@ -35,7 +36,7 @@ from cauri_importers.model import (
     Ticker,
 )
 from cauri_importers.privacy import normalize
-from cauri_importers.table import FileError, read
+from cauri_importers.table import FileError, UnknownFormatError, read
 from cauri_ledger import (
     CatalogAsset,
     Decision,
@@ -61,6 +62,8 @@ class Upload:
 class FileProblem:
     index: int  # posição do arquivo no envio
     message: str
+    # Formato desconhecido: nomes das colunas do cabeçalho, para o usuário mapear.
+    columns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +131,13 @@ def preview(ledger: Ledger, user_id: UUID, uploads: Sequence[Upload]) -> Preview
     if len(uploads) > MAX_FILES:
         raise ImportRejectedError(f"Envie no máximo {MAX_FILES} arquivos por vez.")
 
-    files, problems = _read_files(uploads)
+    profiles = ledger.imports.profiles(user_id)
+    adapters = registry.adapters_for(profiles)
+    files, problems = _read_files(uploads, adapters)
+    used = {f.adapter.name for f in files}
+    ledger.imports.touch_profiles(
+        user_id, [p.id for p in profiles if MappedAdapter(p).name in used]
+    )
     if not files:
         return Preview(batch=None, problems=tuple(problems), file_indexes=())
 
@@ -168,7 +177,9 @@ def preview(ledger: Ledger, user_id: UUID, uploads: Sequence[Upload]) -> Preview
     )
 
 
-def _read_files(uploads: Sequence[Upload]) -> tuple[list[_File], list[FileProblem]]:
+def _read_files(
+    uploads: Sequence[Upload], adapters: Sequence[Adapter]
+) -> tuple[list[_File], list[FileProblem]]:
     files: list[_File] = []
     problems: list[FileProblem] = []
     seen: dict[str, int] = {}
@@ -179,7 +190,10 @@ def _read_files(uploads: Sequence[Upload]) -> tuple[list[_File], list[FileProble
             continue
         seen[digest] = index
         try:
-            detected = read(upload.filename, upload.content, registry.ADAPTERS)
+            detected = read(upload.filename, upload.content, adapters)
+        except UnknownFormatError as exc:
+            problems.append(FileProblem(index, str(exc), tuple(exc.columns)))
+            continue
         except FileError as exc:
             problems.append(FileProblem(index, str(exc)))
             continue
@@ -210,6 +224,7 @@ def _resolve(ledger: Ledger, user_id: UUID, rows: list[_Row]) -> None:
     known = ledger.assets(tickers)
     tesouro: list[CatalogAsset] | None = None
     occurrences: Counter[tuple[str, ...]] = Counter()
+    rates = fx.load(ledger, [r.line.item for r in rows if r.line.item and not r.line.error])
 
     for row in rows:
         line = row.line
@@ -242,6 +257,20 @@ def _resolve(ledger: Ledger, user_id: UUID, rows: list[_Row]) -> None:
         occurrences[(str(row.file.index), *parts)] += 1
         nth = occurrences[(str(row.file.index), *parts)]
         digest = hashlib.sha256("|".join([*parts, str(nth)]).encode()).hexdigest()
+        try:
+            conv = fx.convert(item, rates)
+        except fx.ConversionError as exc:
+            row.error = str(exc)
+            continue
+        row.notes.extend(conv.notes)
+        brl = conv.item
+        if brl.type is MovementType.PROVENTO and brl.amount is not None and brl.amount <= 0:
+            row.ignored = (
+                "Rendimento menor que 1 centavo: não entra como provento (a quantidade "
+                "recebida entra na linha de compra)."
+            )
+            continue
+        rate = conv.rate
         row.draft = MovementDraft(
             idempotency_key=f"imp:{row.file.adapter.family}:{digest[:40]}",
             trade_date=item.trade_date,
@@ -249,14 +278,23 @@ def _resolve(ledger: Ledger, user_id: UUID, rows: list[_Row]) -> None:
             broker_id=broker_id,
             ticker=ticker,
             fixed_income=item.asset.terms if isinstance(item.asset, PrivateFixedIncome) else None,
-            quantity=item.quantity,
-            unit_price=item.unit_price,
-            fees=item.fees,
-            amount=item.amount,
-            factor=item.factor,
-            income_kind=item.income_kind,
-            notes=item.notes,
+            quantity=brl.quantity,
+            unit_price=brl.unit_price,
+            fees=brl.fees,
+            amount=brl.amount,
+            factor=brl.factor,
+            income_kind=brl.income_kind,
+            notes=brl.notes,
             origin_label=row.file.adapter.label,
+            orig_currency=rate.currency if rate else None,
+            orig_value=(item.unit_price if item.unit_price is not None else item.amount)
+            if rate
+            else None,
+            fx_rate=rate.value if rate else None,
+            fx_date=rate.on if rate else None,
+            fx_source=rate.source if rate else None,
+            fee_asset=conv.fee_asset,
+            fee_quantity=conv.fee_quantity,
         )
     _derive_factors(ledger, user_id, rows)
 
@@ -283,6 +321,10 @@ def _content(family: str, item: Item, broker_id: str, ticker: str | None) -> tup
         num(item.factor),
         num(item.credited),
         item.income_kind.value if item.income_kind else "",
+        item.currency,
+        item.fee_asset or "",
+        num(item.fee_quantity),
+        f"{item.fee_paid[0]}:{num(item.fee_paid[1])}" if item.fee_paid else "",
     )
 
 

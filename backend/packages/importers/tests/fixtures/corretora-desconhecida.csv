@@ -1,0 +1,6 @@
+Relatório da Corretora Fictícia;;;;;;
+Cliente;Fulano de Tal;;;;;
+Data Operação;Operação;Papel;Qtde;Preço;Valor Total;Corretagem
+05/01/2026;C;TSTA3;10;20,00;200,00;1,00
+06/01/2026;V;TSTA3;4;22,00;88,00;1,00
+07/01/2026;Dividendo;TSTA3;;;3,00;

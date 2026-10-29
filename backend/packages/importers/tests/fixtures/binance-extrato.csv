@@ -1,0 +1,8 @@
+User_ID;UTC_Time;Account;Operation;Coin;Change;Remark
+98765432;2011-03-03 00:30:00;Earn;Simple Earn Flexible Interest;TSTCOIN;0.01;
+98765432;2011-03-02 14:00:00;Spot;Transaction Buy;TSTCOIN;0.5;
+98765432;2011-03-01 10:00:00;Spot;Deposit;BRL;1000;Fulano de Tal
+98765432;2011-03-02 09:00:00;Earn;Simple Earn Flexible Subscription;USDT;-10;
+98765432;2011-03-03 09:00:00;Spot;P2P Trading;USDT;50;
+98765432;2011-03-03 09:30:00;Spot;Mystery Box;TSTCOIN;1;
+98765432;2011-03-04 00:30:00;Earn;Simple Earn Flexible Interest;USDT;0.0001;

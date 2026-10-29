@@ -374,5 +374,206 @@ def build() -> None:
     )
 
 
+CRYPTO_HEADER = [
+    "data", "tipo", "ativo", "quantidade", "preco", "moeda do preco", "taxa", "ativo da taxa",
+    "exchange", "obs",
+]  # fmt: skip
+
+# Exemplo do template de cripto (público): valores inventados.
+CRYPTO_EXAMPLE = [
+    ["10/03/2025", "compra", "BTC", "0,0025", "350.000,00", "BRL", "0,50", "BRL", "Mercado Bitcoin", ""],
+    ["12/03/2025", "compra", "ETH", "0,1", "2.000,00", "USDT", "0,0001", "BNB", "Binance", "paga em USDT, taxa em BNB"],
+    ["20/04/2025", "recompensa", "ETH", "0,0005", "", "", "", "", "Binance", "staking"],
+    ["02/05/2025", "venda", "BTC", "0,001", "95.000,00", "USD", "1,00", "USD", "Coinbase", ""],
+]  # fmt: skip
+
+
+def build_crypto() -> None:
+    for folder in (TEMPLATE_DIR, PUBLIC_DIR):
+        write_csv(folder / "cauri-cripto.csv", CRYPTO_HEADER, CRYPTO_EXAMPLE)
+        write_xlsx(folder / "cauri-cripto.xlsx", {"Cripto": [CRYPTO_HEADER, *CRYPTO_EXAMPLE]})
+
+    # Binance, com moedas de teste (TSTCOIN é do conftest; TSTFEE e USDT entram no teste) e
+    # datas de março de 2011, longe de qualquer cotação real no banco local. 05/03/2011 é
+    # sábado e 07 e 08/03 foram Carnaval: sem PTAX nesses dias.
+    write_csv(
+        HERE / "binance-trades.csv",
+        ["Date(UTC)", "Pair", "Side", "Price", "Executed", "Amount", "Fee"],
+        [
+            [
+                "2011-03-02 14:00:00",
+                "TSTCOINUSDT",
+                "BUY",
+                "200.00",
+                "0.50000000TSTCOIN",
+                "100.00000000USDT",
+                "0.00050000TSTCOIN",
+            ],
+            [
+                "2011-03-02 15:00:00",
+                "TSTCOINUSDT",
+                "BUY",
+                "200.00",
+                "0.25000000TSTCOIN",
+                "50.00000000USDT",
+                "0.10000000TSTFEE",
+            ],
+            [
+                "2011-03-05 13:00:00",
+                "TSTCOINUSDT",
+                "SELL",
+                "210.00",
+                "0.10000000TSTCOIN",
+                "21.00000000USDT",
+                "0.02100000USDT",
+            ],
+            [
+                "2011-03-04 01:30:00",
+                "TSTCOINBRL",
+                "BUY",
+                "350.00",
+                "0.20000000TSTCOIN",
+                "70.00000000BRL",
+                "0.07000000BRL",
+            ],
+            [
+                "2011-03-04 10:00:00",
+                "TSTFEETSTCOIN",
+                "BUY",
+                "0.01",
+                "10.00000000TSTFEE",
+                "0.10000000TSTCOIN",
+                "0.01000000TSTFEE",
+            ],
+        ],
+    )
+    write_csv(
+        HERE / "binance-trades-antigo.csv",
+        ["Date(UTC)", "Market", "Type", "Price", "Amount", "Total", "Fee", "Fee Coin"],
+        [["2011-03-02 14:00:00", "TSTCOINUSDT", "BUY", "200", "0.5", "100", "0.0005", "TSTCOIN"]],
+    )
+    write_csv(
+        HERE / "binance-convert.csv",
+        [
+            "Date",
+            "Wallet",
+            "Pair",
+            "Type",
+            "Sell",
+            "Buy",
+            "Price",
+            "Inverse Price",
+            "Date Updated",
+            "Status",
+        ],
+        [
+            [
+                "2011-03-03 12:00:00",
+                "Spot",
+                "TSTCOIN/USDT",
+                "Market",
+                "40 USDT",
+                "0.2 TSTCOIN",
+                "200",
+                "0.005",
+                "2011-03-03 12:00:00",
+                "Successful",
+            ],
+            [
+                "2011-03-03 12:05:00",
+                "Spot",
+                "TSTCOIN/USDT",
+                "Market",
+                "10 USDT",
+                "0.05 TSTCOIN",
+                "200",
+                "0.005",
+                "2011-03-03 12:05:00",
+                "Failed",
+            ],
+        ],
+    )
+    write_csv(
+        HERE / "binance-depositos.csv",
+        ["Date(UTC)", "Coin", "Network", "Amount", "TXID", "Status"],
+        [
+            ["2011-03-01 10:00:00", "BRL", "PIX", "1000", "id-ficticio-1", "Completed"],
+            ["2011-03-01 11:00:00", "TSTCOIN", "TST", "0.3", "0xficticio", "Completed"],
+        ],
+    )
+    write_csv(
+        HERE / "binance-extrato.csv",
+        ["User_ID", "UTC_Time", "Account", "Operation", "Coin", "Change", "Remark"],
+        [
+            [
+                "98765432",
+                "2011-03-03 00:30:00",
+                "Earn",
+                "Simple Earn Flexible Interest",
+                "TSTCOIN",
+                "0.01",
+                "",
+            ],
+            ["98765432", "2011-03-02 14:00:00", "Spot", "Transaction Buy", "TSTCOIN", "0.5", ""],
+            ["98765432", "2011-03-01 10:00:00", "Spot", "Deposit", "BRL", "1000", "Fulano de Tal"],
+            [
+                "98765432",
+                "2011-03-02 09:00:00",
+                "Earn",
+                "Simple Earn Flexible Subscription",
+                "USDT",
+                "-10",
+                "",
+            ],
+            ["98765432", "2011-03-03 09:00:00", "Spot", "P2P Trading", "USDT", "50", ""],
+            ["98765432", "2011-03-03 09:30:00", "Spot", "Mystery Box", "TSTCOIN", "1", ""],
+            [
+                "98765432",
+                "2011-03-04 00:30:00",
+                "Earn",
+                "Simple Earn Flexible Interest",
+                "USDT",
+                "0.0001",
+                "",
+            ],
+        ],
+    )
+    write_csv(
+        HERE / "cripto.csv",
+        CRYPTO_HEADER,
+        [
+            [
+                "02/03/2011",
+                "compra",
+                "TSTCOIN",
+                "0,5",
+                "200",
+                "USDT",
+                "0,1",
+                "TSTFEE",
+                "Binance",
+                "",
+            ],
+            ["04/03/2011", "venda", "TSTCOIN", "0,1", "380", "BRL", "1,00", "BRL", "Binance", ""],
+            ["04/03/2011", "recompensa", "TSTCOIN", "0,01", "", "", "", "", "Binance", "staking"],
+        ],
+    )
+
+    # Formato que nenhum adaptador conhece, para o mapeamento de colunas. Uma linha de
+    # identificação inventada acima do cabeçalho não pode ser confundida com ele.
+    write_csv(
+        HERE / "corretora-desconhecida.csv",
+        ["Relatório da Corretora Fictícia", "", "", "", "", "", ""],
+        [
+            ["Cliente", "Fulano de Tal", "", "", "", "", ""],
+            ["Data Operação", "Operação", "Papel", "Qtde", "Preço", "Valor Total", "Corretagem"],
+            ["05/01/2026", "C", "TSTA3", "10", "20,00", "200,00", "1,00"],
+            ["06/01/2026", "V", "TSTA3", "4", "22,00", "88,00", "1,00"],
+            ["07/01/2026", "Dividendo", "TSTA3", "", "", "3,00", ""],
+        ],
+    )
+
+
 if __name__ == "__main__":
     build()
+    build_crypto()

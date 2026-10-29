@@ -47,6 +47,13 @@ def to_json(d: MovementDraft) -> dict[str, Any]:
         "income_kind": d.income_kind.value if d.income_kind else None,
         "notes": d.notes,
         "origin_label": d.origin_label,
+        "orig_currency": d.orig_currency,
+        "orig_value": _num(d.orig_value),
+        "fx_rate": _num(d.fx_rate),
+        "fx_date": d.fx_date.isoformat() if d.fx_date else None,
+        "fx_source": d.fx_source,
+        "fee_asset": d.fee_asset,
+        "fee_quantity": _num(d.fee_quantity),
     }
 
 
@@ -75,4 +82,11 @@ def from_json(data: Mapping[str, Any]) -> MovementDraft:
         income_kind=IncomeKind(data["income_kind"]) if data.get("income_kind") else None,
         notes=data.get("notes"),
         origin_label=data.get("origin_label"),
+        orig_currency=data.get("orig_currency"),
+        orig_value=_dec(data.get("orig_value")),
+        fx_rate=_dec(data.get("fx_rate")),
+        fx_date=date.fromisoformat(data["fx_date"]) if data.get("fx_date") else None,
+        fx_source=data.get("fx_source"),
+        fee_asset=data.get("fee_asset"),
+        fee_quantity=_dec(data.get("fee_quantity")),
     )

@@ -1,0 +1,5 @@
+data;tipo;ativo;quantidade;preco;moeda do preco;taxa;ativo da taxa;exchange;obs
+10/03/2025;compra;BTC;0,0025;350.000,00;BRL;0,50;BRL;Mercado Bitcoin;
+12/03/2025;compra;ETH;0,1;2.000,00;USDT;0,0001;BNB;Binance;paga em USDT, taxa em BNB
+20/04/2025;recompensa;ETH;0,0005;;;;;Binance;staking
+02/05/2025;venda;BTC;0,001;95.000,00;USD;1,00;USD;Coinbase;
