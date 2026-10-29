@@ -42,6 +42,7 @@ class ManualEntryIn(_In):
     fi_maturity: date | None = None
     fi_label: str | None = Field(default=None, max_length=120)
     notes: str | None = Field(default=None, max_length=500)
+    opening_balance: bool = False
 
     def to_form(self) -> ManualEntryForm:
         return ManualEntryForm(**self.model_dump())
@@ -188,6 +189,7 @@ class ImportDraftOut(BaseModel):
     fx_source: Literal["ptax", "fechamento"] | None = None
     fee_asset: str | None = None
     fee_quantity: str | None = None
+    opening_balance: bool = False
 
 
 class ImportRowOut(BaseModel):
@@ -210,6 +212,19 @@ class ImportFileOut(BaseModel):
     counts: dict[str, int]
 
 
+class OpeningSuggestionOut(BaseModel):
+    """Saldo que falta para uma venda descoberta, com a sugestão de saldo inicial."""
+
+    ticker: str
+    broker_id: str
+    trade_date: date
+    quantity: str
+    first_shortfall: date
+    unit_cost: str | None
+    cost_note: str | None
+    deposit: dict[str, str] | None
+
+
 class ImportBatchOut(BaseModel):
     id: UUID
     status: BatchStatusOut
@@ -218,6 +233,15 @@ class ImportBatchOut(BaseModel):
     warnings: list[str]
     files: list[ImportFileOut]
     counts: dict[str, int]
+    suggestions: list[OpeningSuggestionOut] = []
+
+
+class OpeningBalanceIn(_In):
+    ticker: str = Field(min_length=1, max_length=40)
+    trade_date: date
+    quantity: str = Field(min_length=1, max_length=40)
+    unit_cost: str = Field(min_length=1, max_length=40)
+    broker_id: str = Field(min_length=1, max_length=60)
 
 
 class FileProblemOut(BaseModel):

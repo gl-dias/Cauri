@@ -26,10 +26,13 @@ from cauri_api.schemas import (
     ImportPreviewOut,
     ImportRowOut,
     ImportSummaryOut,
+    OpeningBalanceIn,
+    OpeningSuggestionOut,
     ProfileIn,
     ProfileOut,
 )
 from cauri_api.session import SessionDep
+from cauri_core.money import parse_br_decimal
 from cauri_importers.service import MAX_FILES
 from cauri_importers.table import MAX_BYTES
 from cauri_ledger import ImportProfile, Ledger, StoredBatch
@@ -147,6 +150,33 @@ def commit(batch_id: UUID, body: ImportCommitIn, session: SessionDep) -> ImportC
     )
 
 
+@router.post("/{batch_id}/opening-balances", response_model=ImportBatchOut)
+def add_opening_balance(
+    batch_id: UUID, body: OpeningBalanceIn, session: SessionDep
+) -> ImportBatchOut:
+    """Inclui no lote um saldo inicial (entra junto ao confirmar) e confere tudo de novo."""
+    try:
+        quantity = parse_br_decimal(body.quantity)
+        unit_cost = parse_br_decimal(body.unit_cost)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Número inválido.") from exc
+    with session.member() as conn:
+        ledger = Ledger(conn)
+        if body.broker_id not in ledger.brokers():
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Corretora desconhecida.")
+        batch = importers.add_opening_balance(
+            ledger,
+            session.user.id,
+            batch_id,
+            ticker=body.ticker,
+            trade_date=body.trade_date,
+            quantity=quantity,
+            unit_cost=unit_cost,
+            broker_id=body.broker_id,
+        )
+        return _batch_out(ledger, batch)
+
+
 @router.post("/{batch_id}/discard", status_code=status.HTTP_204_NO_CONTENT)
 def discard(batch_id: UUID, session: SessionDep) -> None:
     with session.member() as conn:
@@ -187,6 +217,7 @@ def _batch_out(ledger: Ledger, batch: StoredBatch) -> ImportBatchOut:
             fx_source=draft.get("fx_source"),
             fee_asset=draft.get("fee_asset"),
             fee_quantity=draft.get("fee_quantity"),
+            opening_balance=bool(draft.get("opening_balance")),
         )
 
     return ImportBatchOut(
@@ -195,6 +226,7 @@ def _batch_out(ledger: Ledger, batch: StoredBatch) -> ImportBatchOut:
         created_at=batch.created_at,
         finished_at=batch.finished_at,
         warnings=list(batch.warnings),
+        suggestions=[OpeningSuggestionOut(**s) for s in batch.suggestions],
         counts=dict(Counter(r.status for r in rows)),
         files=[
             ImportFileOut(

@@ -387,3 +387,57 @@ class TestPerfisDeImportacao:
         res = client.delete(f"/v1/imports/profiles/{profile['id']}", headers=auth(bruno))
         assert res.status_code == 404
         assert len(client.get("/v1/imports/profiles", headers=auth(ana)).json()) == 1
+
+
+class TestSaldoInicial:
+    def test_lancamento_manual_de_saldo_inicial(self, client, make_user, as_user):
+        user = make_user()
+        body = {"entries": [entry(opening_balance=True, fees=None, unit_price="18,00")]}
+        res = client.post("/v1/movements", json=body, headers=auth(user))
+        assert res.status_code == 201
+        with as_user(user) as conn:
+            row = conn.execute(
+                "select opening_balance, origin_label from ledger.movements where id = %s",
+                [res.json()["created"][0]],
+            ).fetchone()
+        assert row["opening_balance"] is True
+        assert row["origin_label"] == "Saldo inicial"
+
+        sale = {"entries": [entry(type="venda", opening_balance=True)]}
+        assert (
+            client.post("/v1/movements/check", json=sale, headers=auth(user)).json()["ok"] is False
+        )
+
+    def test_venda_descoberta_na_importacao_sugere_e_aceita_saldo_inicial(self, client, make_user):
+        user = make_user()
+        sale = (
+            b"data;tipo;ativo;classe;quantidade;preco;corretora\n"
+            b"10/02/2026;venda;TSTA3;acao;30;25,00;Corretora Teste A\n"
+        )
+        batch = upload(client, user, ("venda.csv", sale)).json()["batch"]
+        assert batch["counts"] == {"error": 1}
+        [suggestion] = batch["suggestions"]
+        assert suggestion["ticker"] == "TSTA3"
+        assert suggestion["trade_date"] == "2026-02-09"
+        assert suggestion["quantity"] == "30"
+
+        res = client.post(
+            f"/v1/imports/{batch['id']}/opening-balances",
+            json={
+                "ticker": "TSTA3",
+                "trade_date": "2026-02-09",
+                "quantity": "30",
+                "unit_cost": "20,00",
+                "broker_id": "corretora-teste-a",
+            },
+            headers=auth(user),
+        )
+        assert res.status_code == 200
+        updated = res.json()
+        assert updated["counts"] == {"ok": 2}
+        assert updated["suggestions"] == []
+        opening_file = updated["files"][-1]
+        assert opening_file["label"] == "Saldos iniciais"
+        assert opening_file["rows"][0]["draft"]["opening_balance"] is True
+        res = client.post(f"/v1/imports/{batch['id']}/commit", json={}, headers=auth(user))
+        assert res.json()["created"] == 2
