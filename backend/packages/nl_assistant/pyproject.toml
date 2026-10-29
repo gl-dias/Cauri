@@ -1,0 +1,20 @@
+[project]
+name = "cauri-nl-assistant"
+version = "0.1.0"
+description = "Assistente de lançamentos: frase (texto ou voz) para cartão de confirmação pelo ledger"
+requires-python = ">=3.13"
+dependencies = [
+  "cauri-core",
+  "cauri-engine",
+  "cauri-ledger",
+  "httpx>=0.28",
+]
+
+[tool.uv.sources]
+cauri-core = { workspace = true }
+cauri-engine = { workspace = true }
+cauri-ledger = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"

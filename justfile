@@ -6,7 +6,7 @@ set dotenv-load
 set windows-shell := ["bash", "-cu"]
 
 supabase := "supabase"
-packages := "-p cauri_core -p cauri_storage -p cauri_engine -p cauri_ledger -p cauri_manual_entry -p cauri_importers -p cauri_ingest_market -p cauri_api -p cauri_jobs"
+packages := "-p cauri_core -p cauri_storage -p cauri_engine -p cauri_ledger -p cauri_manual_entry -p cauri_importers -p cauri_nl_assistant -p cauri_ingest_market -p cauri_api -p cauri_jobs"
 
 # Lista os recipes
 default:
@@ -39,7 +39,12 @@ lint:
 e2e *args:
     cd web && npx playwright test {{args}}
 
-# Ponta a ponta de verdade: precisa de `just db-start`, `just api` e `npm run dev` no ar
+# Haiku de verdade nas frases de exemplo (opcional, precisa de ANTHROPIC_API_KEY no ambiente)
+test-llm:
+    cd backend && CAURI_LLM_LIVE=1 uv run pytest packages/nl_assistant/tests/test_llm_live.py
+
+# Ponta a ponta de verdade: precisa de `just db-start`, `just api` (com
+# CAURI_ASSISTANT_EXTRACTOR=regras se não houver chave da Anthropic) e `npm run dev` no ar
 e2e-live:
     cd web && CAURI_E2E_LIVE=1 npx playwright test e2e/app-live.spec.ts --project=desktop
 

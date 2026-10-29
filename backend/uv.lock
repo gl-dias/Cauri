@@ -16,6 +16,7 @@ members = [
     "cauri-jobs",
     "cauri-ledger",
     "cauri-manual-entry",
+    "cauri-nl-assistant",
     "cauri-storage",
 ]
 
@@ -135,6 +136,7 @@ dependencies = [
     { name = "cauri-importers" },
     { name = "cauri-ledger" },
     { name = "cauri-manual-entry" },
+    { name = "cauri-nl-assistant" },
     { name = "cauri-storage" },
     { name = "fastapi" },
     { name = "pydantic-settings" },
@@ -150,6 +152,7 @@ requires-dist = [
     { name = "cauri-importers", editable = "packages/importers" },
     { name = "cauri-ledger", editable = "packages/ledger" },
     { name = "cauri-manual-entry", editable = "packages/manual_entry" },
+    { name = "cauri-nl-assistant", editable = "packages/nl_assistant" },
     { name = "cauri-storage", editable = "packages/storage" },
     { name = "fastapi", specifier = ">=0.120" },
     { name = "pydantic-settings", specifier = ">=2.11" },
@@ -277,6 +280,25 @@ dependencies = [
 requires-dist = [
     { name = "cauri-core", editable = "packages/core" },
     { name = "cauri-ledger", editable = "packages/ledger" },
+]
+
+[[package]]
+name = "cauri-nl-assistant"
+version = "0.1.0"
+source = { editable = "packages/nl_assistant" }
+dependencies = [
+    { name = "cauri-core" },
+    { name = "cauri-engine" },
+    { name = "cauri-ledger" },
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cauri-core", editable = "packages/core" },
+    { name = "cauri-engine", editable = "packages/engine" },
+    { name = "cauri-ledger", editable = "packages/ledger" },
+    { name = "httpx", specifier = ">=0.28" },
 ]
 
 [[package]]

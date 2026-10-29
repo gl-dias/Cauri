@@ -59,6 +59,7 @@ root_packages = [
   "cauri_ledger",
   "cauri_manual_entry",
   "cauri_importers",
+  "cauri_nl_assistant",
   "cauri_ingest_market",
   "cauri_api",
   "cauri_jobs",
@@ -69,7 +70,7 @@ name = "Camadas: apps > canais de entrada > ledger > engine > storage > core"
 type = "layers"
 layers = [
   "cauri_api | cauri_jobs",
-  "cauri_manual_entry | cauri_importers | cauri_ingest_market",
+  "cauri_manual_entry | cauri_importers | cauri_nl_assistant | cauri_ingest_market",
   "cauri_ledger",
   "cauri_engine",
   "cauri_storage",
@@ -85,7 +86,7 @@ forbidden_modules = ["cauri_ledger", "cauri_engine"]
 [[tool.importlinter.contracts]]
 name = "Canais de entrada só chegam ao banco pelo ledger"
 type = "forbidden"
-source_modules = ["cauri_manual_entry", "cauri_importers"]
+source_modules = ["cauri_manual_entry", "cauri_importers", "cauri_nl_assistant"]
 forbidden_modules = ["cauri_storage", "psycopg"]
 allow_indirect_imports = true  # via ledger pode; direto, não
 
