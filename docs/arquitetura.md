@@ -190,13 +190,16 @@ ledger.movements (
   version, created_at, updated_at, voided_at, voided_by, void_reason)
 ledger.movement_history (movement_id, version, op, before jsonb, after jsonb, actor, reason, at)
 
--- imports (por usuário)
-imports.batches  (id, user_id, status 'preview'|'committed'|'discarded', created_at, committed_at)
-imports.files    (id, batch_id, user_id, filename, sha256, adapter, adapter_version, broker_id,
-                  storage_path)
-imports.rows     (id, file_id, user_id, row_number, raw jsonb, parsed jsonb, fingerprint,
-                  status 'ok'|'error'|'already_imported'|'possible_duplicate', error,
-                  match_movement_id, decision, movement_id → ledger.movements)
+-- imports (por usuário; o arquivo e o nome dele nunca são guardados)
+imports.batches  (id, user_id, status 'preview'|'committed'|'discarded', warnings jsonb,
+                  created_at, finished_at)
+imports.files    (id, batch_id, user_id, position, label, sha256, size_bytes, adapter,
+                  adapter_version)                       -- label: "B3 · Negociação, 01/2026 a 06/2026"
+imports.rows     (id, file_id, user_id, position, line_numbers int[], raw jsonb, draft jsonb,
+                  idempotency_key, status 'ok'|'error'|'already_imported'|'possible_duplicate'
+                  |'ignored', messages jsonb, match_movement_ids uuid[],
+                  decision 'import'|'keep_existing'|'replace'|'import_new',
+                  movement_id → ledger.movements)
 
 -- assistant (por usuário)
 assistant.conversations  (id, user_id, title, created_at)
@@ -246,13 +249,18 @@ usadas; o desenho acima é o alvo.
 - **O LLM não vê a carteira.** Ele só extrai `{tipo, ativo como falado, qtd, preço?,
   data?}`. A resolução para ticker e a regra de ambiguidade são código Python
   determinístico, melhor para privacidade e para os testes.
-- **Idempotência da importação:** cada linha gera um fingerprint (adaptador + conteúdo
-  normalizado + ordem de ocorrência no arquivo) que vira `idempotency_key`.
+- **Idempotência da importação:** cada linha vira a chave `imp:<fonte>:<hash>`, com o hash
+  do conteúdo normalizado (data, tipo, ativo, corretora, números) e da ordem de ocorrência
+  entre linhas iguais do mesmo arquivo.
   - Reenviar o arquivo não duplica nada.
   - Um export com período sobreposto também não.
   - Duas compras idênticas no mesmo dia continuam sendo duas.
-- **Reconciliação:** cruza (ativo, data, tipo, quantidade) com movimentos de outra
-  origem e oferece "manter existente", "substituir pela planilha" ou "importar como nova".
+- **Reconciliação:** cruza (ativo, data, tipo, quantidade, ou valor, ou fator) com o que
+  veio de outra fonte (manual, chat ou outra importação: a B3 e a planilha própria são
+  fontes diferentes) e oferece "manter a existente" (padrão), "substituir pela planilha"
+  ou "importar como nova". Substituir remove a antiga, com motivo no histórico, na mesma
+  transação em que a nova entra; por isso trocar uma venda manual pela mesma venda da B3
+  não acusa venda descoberta.
 - **Rentabilidade pelo método de cotas (TWR diário)**, para aporte não distorcer o
   percentual. CDI e IPCA viram índices acumulados no mesmo período. O IPCA entra mês a
   mês, só com meses já publicados.
@@ -406,8 +414,9 @@ Fase 3, screenshots de cada tela em desktop e celular.
 3. **Frontend (entregue):** 3a, tema de vidro, componentes e Início no `/demo`; 3b,
    Carteira, Lançamentos (com o lançamento manual, edição e remoção), Admin e `/app` com
    login por magic link.
-4. **Importação:** importers (adaptador genérico + os das corretoras a partir dos
-   exemplos), tela Importar, reconciliação entre origens, vitrine estática no `/demo`.
+4. **Importação:** importers (B3 Negociação e Movimentação, template genérico e o
+   export da exchange de cripto; corretoras individuais só se a B3 não cobrir algo), tela
+   Importar, reconciliação entre origens, vitrine estática no `/demo`.
 5. **Assistente:** `nl_assistant`, tela Assistente com texto e voz, vitrine estática no
    `/demo`.
 6. **Deploy final:** Cloudflare Pages, Supabase em produção, API na VPS via GitHub
@@ -487,6 +496,21 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
   real com Supabase, API e Mailpit locais: login pelo magic link, lançamento gravado pela
   API, admin e a allowlist barrando quem não foi convidado.
 
+### Importar (Fase 4)
+
+- **Vários arquivos por envio**, `.xlsx` ou `.csv`, até 10 de 5 MB. O formato é detectado
+  pelo cabeçalho (B3 Negociação, B3 Movimentação ou template do Cauri).
+- **Pré-visualização antes de gravar:** cada linha aparece como pronta, possível duplicada,
+  já importada, com erro ou ignorada, sempre com o motivo. Duplicados têm a decisão na
+  própria linha. Nada entra no ledger antes de "Importar N".
+- **O arquivo nunca é guardado**, nem o nome dele: o lote guarda um rótulo gerado, o hash e
+  o tamanho. O leitor só carrega as colunas que o adaptador declara (CPF, nome e qualquer
+  outra coluna nem entram na memória do resto do sistema); texto livre com cara de CPF é
+  mascarado; e uma constraint no banco recusa CPF formatado no `raw`.
+- **Template para baixar** na própria tela (`.xlsx` e `.csv`), gerado pelo mesmo script das
+  fixtures (`backend/packages/importers/tests/fixtures/build_fixtures.py`).
+- **No /demo**, uma pré-visualização de exemplo com dados inventados, sem chamada ao backend.
+
 ## 7. Decisões confirmadas
 
 | tema | decisão |
@@ -530,9 +554,39 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
   movimentação continua gravada, a marca em `engine.dirty_ranges` fica e o job da noite
   completa. A resposta do `POST /v1/movements` diz se os snapshots foram atualizados.
 
-### Rascunho do template genérico de planilha
+### Ajustes feitos durante a Fase 4
 
-CSV ou XLSX, vírgula decimal, datas `dd/mm/aaaa`, uma linha por movimentação.
+- **B3, regras de leitura** (layout dos exports públicos da Área do Investidor):
+  - Negociação: só mercado à vista e fracionário (`PETR4F` vira `PETR4`). Opções, termo e
+    futuros ficam como ignorados. O export não traz corretagem nem emolumentos, então as
+    compras entram sem taxas (o envio avisa).
+  - Movimentação: "Transferência - Liquidação" é reflexo de uma negociação e é ignorada,
+    nunca vira movimento duplicado. Dividendo, JCP, Rendimento e Juros viram proventos;
+    compra, venda, vencimento e resgate do Tesouro viram compra e venda do título.
+  - Eventos (desdobro, grupamento, bonificação) chegam como quantidade creditada por
+    corretora: as linhas do mesmo evento são somadas e o fator sai da posição consolidada
+    na véspera (ledger + linhas anteriores do envio). A pré-visualização mostra a conta.
+  - Ficam de fora, com o motivo na linha: fração e leilão de fração (centavos), taxa de
+    custódia do Tesouro (valor bruto), empréstimo de ações, transferência de custódia entre
+    corretoras (a posição total não muda; a visão por corretora pode ficar defasada) e
+    amortização ou restituição de capital (o preço médio ainda não é ajustado).
+  - Pedem lançamento manual, como erro explicado: subscrição exercida, incorporação e
+    "Atualização". Tipo desconhecido também vira erro, nunca some calado.
+- **Duplicado provável começa como "manter a existente"** e, na pré-visualização, não soma
+  na simulação da linha do tempo (senão uma venda repetida apareceria como venda
+  descoberta). Se o usuário escolher "importar como nova", a gravação confere de novo.
+- **Mesma operação em dois arquivos de fontes diferentes no mesmo envio** (B3 e planilha
+  própria) vira erro na segunda: importe em envios separados para escolher qual manter.
+  Da mesma fonte (exports sobrepostos), a repetida é ignorada.
+- **Se a carteira mudou entre a pré-visualização e a gravação**, a gravação é recusada
+  inteira, com a linha e o motivo (tudo ou nada).
+- **Template ganhou a coluna opcional `tipo_provento`** (padrão: dividendo para ação,
+  rendimento para FII, juros para Tesouro e renda fixa).
+
+### Template genérico de planilha
+
+CSV ou XLSX, vírgula decimal, datas `dd/mm/aaaa`, uma linha por movimentação. O arquivo
+de exemplo fica em `reference/import-template/` e no botão "Template" da tela Importar.
 
 | coluna | obrigatória | exemplo | notas |
 |---|---|---|---|
@@ -549,4 +603,5 @@ CSV ou XLSX, vírgula decimal, datas `dd/mm/aaaa`, uma linha por movimentação.
 | `pct_cdi` | depende | `110` | renda fixa: % do CDI |
 | `vencimento` | depende | `15/03/2028` | renda fixa |
 | `emissor` | depende | `Banco Y` | renda fixa |
+| `tipo_provento` | não | `rendimento` | dividendo, jcp, rendimento ou juros; sem ela, vale o padrão da classe |
 | `obs` | não | | texto livre |
