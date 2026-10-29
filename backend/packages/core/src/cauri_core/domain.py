@@ -80,6 +80,8 @@ class Movement:
     factor: Decimal | None = None
     income_kind: IncomeKind | None = None
     seq: int = 0
+    # Compra marcada como saldo inicial: posição que já existia antes do histórico.
+    opening_balance: bool = False
 
     @property
     def position_key(self) -> UUID:

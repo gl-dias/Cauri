@@ -143,11 +143,18 @@ class PortfolioInputs:
     ipca_monthly: Mapping[date, Decimal] = field(default_factory=dict)
 
 
-def _flows_of(m: Movement) -> _Flows:
+def _flows_of(m: Movement, prices: PriceBook, day: date) -> _Flows:
     match m.type:
         case MovementType.COMPRA:
             assert m.quantity is not None
             assert m.unit_price is not None
+            if m.opening_balance and m.asset_id is not None:
+                # Saldo inicial entra pelo valor de mercado do dia: o custo informado vale
+                # para o preço médio, mas a diferença para o mercado é anterior ao histórico
+                # e não pode aparecer como rendimento no dia em que o saldo entra.
+                found = prices.last_on_or_before(m.asset_id, day)
+                if found is not None:
+                    return _Flows(inflow=m.quantity * found[0])
             return _Flows(inflow=m.quantity * m.unit_price + m.fees)
         case MovementType.VENDA:
             assert m.quantity is not None
@@ -216,7 +223,7 @@ def compute_snapshots(inputs: PortfolioInputs, days: Iterable[date]) -> list[Day
                     )
                     fi_books[m.instrument_id] = book
                 book.apply(m)
-            f = _flows_of(m)
+            f = _flows_of(m, inputs.prices, day)
             for target in (flows_total, flows_class[asset_class], flows_broker[m.broker_id]):
                 target.inflow += f.inflow
                 target.outflow += f.outflow

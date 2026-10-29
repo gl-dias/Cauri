@@ -62,13 +62,14 @@ def _movement(row: dict[str, Any], seq: int) -> Movement:
         factor=row["factor"],
         income_kind=IncomeKind(row["income_kind"]) if row["income_kind"] else None,
         seq=seq,
+        opening_balance=row["opening_balance"],
     )
 
 
 def load_inputs(conn: Conn, user_id: UUID, until: date) -> PortfolioInputs | None:
     rows = conn.execute(
         "select id, trade_date, type, broker_id, asset_id, instrument_id, quantity, unit_price,"
-        " fees, amount, factor, income_kind from ledger.movements"
+        " fees, amount, factor, income_kind, opening_balance from ledger.movements"
         " where user_id = %s and voided_at is null and trade_date <= %s"
         " order by created_at, id",
         [user_id, until],

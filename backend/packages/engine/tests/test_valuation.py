@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
@@ -154,3 +155,16 @@ def test_linha_do_cdi_desconta_as_mesmas_saidas():
     assert snaps[MON].cdi_equivalent == D("1000.00")
     # 1000 rende 2 dias de CDI (seg->ter, ter->qua) e saem 500 na quarta.
     assert snaps[WED].cdi_equivalent == (D("1000.00") * D("1.0005") ** 2 - 500).quantize(D("0.01"))
+
+
+def test_saldo_inicial_entra_pelo_mercado_e_nao_vira_rendimento_no_dia():
+    """Saldo inicial com custo antigo (R$ 6) num dia em que o ativo vale R$ 10: o preço médio
+    é o custo informado, mas a cota não sobe 66% no dia em que o saldo entra."""
+    prices = {ASSET_A: {MON: D(10), TUE: D(11)}}
+    opening = replace(buy(MON, 100, 6), opening_balance=True)
+    snaps = by_day(compute_snapshots(inputs([opening], prices), [MON, TUE]))
+    assert snaps[MON].total.net_flows == D("1000.00")  # entrada a mercado, não a custo
+    assert snaps[MON].total.quota_value == 1
+    assert snaps[TUE].total.quota_value == D("1.1")
+    assert snaps[TUE].positions[0].avg_cost == 6
+    assert snaps[TUE].total.cost_basis == D("600.00")
