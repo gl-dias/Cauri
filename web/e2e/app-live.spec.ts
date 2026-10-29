@@ -43,15 +43,22 @@ async function requestLink(page: Page, address: string) {
   await expect(page.getByText("Confira seu e-mail")).toBeVisible();
 }
 
+/** Entra pelo magic link e espera a sessão de verdade (o app troca o código do link pela
+ * sessão depois de carregar; navegar antes disso cai no login). */
+async function login(page: Page) {
+  const since = Date.now() - 1000;
+  await requestLink(page, ADMIN);
+  await page.goto(await magicLink(ADMIN, since));
+  await expect(page).toHaveURL(/\/app/);
+  await expect(page.getByRole("link", { name: "Admin" }).first()).toBeVisible();
+}
+
 test.describe("ao vivo", () => {
   test.skip(!LIVE, "só roda com CAURI_E2E_LIVE=1 (Supabase, API e Mailpit locais)");
   test.beforeEach(({}, info) => test.skip(info.project.name !== "desktop", "fluxo testado uma vez, no desktop"));
 
   test("convidado entra pelo magic link, grava um lançamento e vê o admin", async ({ page }) => {
-    const since = Date.now() - 1000;
-    await requestLink(page, ADMIN);
-    await page.goto(await magicLink(ADMIN, since));
-    await expect(page).toHaveURL(/\/app/);
+    await login(page);
     await expect(page.getByRole("link", { name: "Admin" }).first()).toBeVisible();
 
     await page.goto("/app/lancamentos");
@@ -77,10 +84,7 @@ test.describe("ao vivo", () => {
   });
 
   test("importa uma planilha pela tela e o reenvio não duplica", async ({ page }) => {
-    const since = Date.now() - 1000;
-    await requestLink(page, ADMIN);
-    await page.goto(await magicLink(ADMIN, since));
-    await expect(page).toHaveURL(/\/app/);
+    await login(page);
 
     // Preço único por execução: cada rodada é uma operação nova para o ledger.
     const price = (30 + (Date.now() % 1000) / 100).toFixed(2).replace(".", ",");
@@ -105,11 +109,28 @@ test.describe("ao vivo", () => {
     await expect(page.getByText("Arraste os arquivos aqui")).toBeVisible();
   });
 
+  test("venda descoberta oferece saldo inicial e a prévia volta a fechar", async ({ page }) => {
+    await login(page);
+
+    // Venda bem antes de qualquer compra do usuário de teste: a posição não existe.
+    const qty = 1000 + (Date.now() % 1000);
+    const csv = Buffer.from(`data;tipo;ativo;classe;quantidade;preco;corretora
+03/02/2025;venda;PETR4;acao;${qty};30,00;XP Investimentos
+`);
+    await page.goto("/app/importar");
+    await page.getByLabel("Escolher arquivos").setInputFiles({ name: "venda-e2e.csv", mimeType: "text/csv", buffer: csv });
+    await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    await expect(page.getByText("Falta saldo de PETR4", { exact: true })).toBeVisible();
+    await page.getByLabel("Custo médio (R$)").fill("25,00");
+    await page.getByRole("button", { name: "Incluir saldo inicial e conferir de novo" }).click();
+    await expect(page.getByRole("button", { name: "Importar 2" })).toBeVisible();
+    await expect(page.getByText("Falta saldo de PETR4", { exact: true })).toBeHidden();
+    await page.getByRole("button", { name: "Descartar" }).click();
+    await expect(page.getByText("Arraste os arquivos aqui")).toBeVisible();
+  });
+
   test("arquivo desconhecido vira perfil e passa a ser reconhecido", async ({ page }) => {
-    const since = Date.now() - 1000;
-    await requestLink(page, ADMIN);
-    await page.goto(await magicLink(ADMIN, since));
-    await expect(page).toHaveURL(/\/app/);
+    await login(page);
 
     // Cabeçalho único por execução: o perfil é sempre novo e é apagado no fim.
     const run = Date.now().toString(36);

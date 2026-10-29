@@ -8,7 +8,7 @@ import path from "node:path";
 
 import type { Page, Route } from "@playwright/test";
 
-import { SAMPLE_BATCH } from "../src/features/import/sample";
+import { SAMPLE_BATCH, SAMPLE_SHORTFALL_BATCH } from "../src/features/import/sample";
 
 export const LIVE = process.env.CAURI_E2E_LIVE === "1";
 
@@ -187,7 +187,11 @@ export async function mockApp(page: Page, { role = "admin" as "admin" | "user" }
     if (path.endsWith("/v1/imports/profiles") && req.method() === "GET") return route.fulfill({ json: PROFILES });
     if (path.endsWith("/v1/imports") && req.method() === "POST") {
       // Arquivo "desconhecido": a API devolve só os nomes das colunas, para o mapeamento.
-      if ((req.postDataBuffer()?.toString("latin1") ?? "").includes("desconhecida")) {
+      const body = req.postDataBuffer()?.toString("latin1") ?? "";
+      if (body.includes("deposito-usdt")) {
+        return route.fulfill({ status: 201, json: { batch: SAMPLE_SHORTFALL_BATCH, problems: [], file_indexes: [0, 1] } });
+      }
+      if (body.includes("desconhecida")) {
         return route.fulfill({ status: 201, json: { batch: null, problems: [{ index: 0, message: "Não reconheci o formato deste arquivo.", columns: UNKNOWN_COLUMNS }], file_indexes: [] } });
       }
       return route.fulfill({ status: 201, json: { batch: SAMPLE_BATCH, problems: [], file_indexes: [0, 1, 2] } });

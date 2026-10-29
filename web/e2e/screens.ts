@@ -63,6 +63,20 @@ export const SCREENS: Screen[] = [
     },
   },
   {
+    name: "app-importar-saldo",
+    path: "/app/importar",
+    ready: "Arraste os arquivos aqui",
+    setup: (page) => mockApp(page),
+    after: async (page) => {
+      await page.getByLabel("Escolher arquivos").setInputFiles([
+        { name: "binance-deposito-usdt.csv", mimeType: "text/csv", buffer: Buffer.from("fictício") },
+        { name: "binance-trades.csv", mimeType: "text/csv", buffer: Buffer.from("fictício 2") },
+      ]);
+      await page.getByRole("button", { name: "Pré-visualizar" }).click();
+      await expect(page.getByText("Falta saldo de USDT", { exact: true })).toBeVisible();
+    },
+  },
+  {
     name: "app-importar-mapear",
     path: "/app/importar",
     ready: "Arraste os arquivos aqui",
