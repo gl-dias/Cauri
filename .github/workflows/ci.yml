@@ -82,7 +82,7 @@ jobs:
         run: >
           uv run mypy
           -p cauri_core -p cauri_storage -p cauri_engine -p cauri_ledger
-          -p cauri_manual_entry -p cauri_ingest_market -p cauri_api -p cauri_jobs
+          -p cauri_manual_entry -p cauri_importers -p cauri_ingest_market -p cauri_api -p cauri_jobs
 
       - name: Fronteiras entre módulos (import-linter)
         working-directory: backend

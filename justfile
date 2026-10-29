@@ -6,7 +6,7 @@ set dotenv-load
 set windows-shell := ["bash", "-cu"]
 
 supabase := "supabase"
-packages := "-p cauri_core -p cauri_storage -p cauri_engine -p cauri_ledger -p cauri_manual_entry -p cauri_ingest_market -p cauri_api -p cauri_jobs"
+packages := "-p cauri_core -p cauri_storage -p cauri_engine -p cauri_ledger -p cauri_manual_entry -p cauri_importers -p cauri_ingest_market -p cauri_api -p cauri_jobs"
 
 # Lista os recipes
 default:

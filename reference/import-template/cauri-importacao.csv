@@ -1,0 +1,9 @@
+data;tipo;ativo;classe;quantidade;preco;fator;taxas;valor;corretora;pct_cdi;vencimento;emissor;tipo_provento;obs
+10/03/2025;compra;PETR4;acao;100;36,80;;4,90;;XP Investimentos;;;;;
+12/03/2025;compra;HGLG11;fii;20;158,40;;0;;BTG Pactual;;;;;
+14/04/2025;provento;HGLG11;fii;;;;;22,00;BTG Pactual;;;;rendimento;
+02/05/2025;compra;Tesouro Selic 2029;tesouro;0,35;15.120,44;;;;XP Investimentos;;;;;
+05/05/2025;aporte;CDB Banco Exemplo 110% CDI;renda_fixa;;;;;5.000,00;Nubank;110;05/05/2028;Banco Exemplo;;
+20/05/2025;compra;BTC;cripto;0,0025;560.000,00;;;;Binance;;;;;
+02/06/2025;venda;PETR4;acao;40;38,10;;4,90;;XP Investimentos;;;;;venda parcial
+16/06/2025;desdobramento;PETR4;acao;;;2;;;XP Investimentos;;;;;1 vira 2

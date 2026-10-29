@@ -1,0 +1,8 @@
+data;tipo;ativo;classe;quantidade;preco;fator;taxas;valor;corretora;pct_cdi;vencimento;emissor;tipo_provento;obs
+10/03/2025;compra;PETR4;acao;100;36,80;;4,90;;XP Investimentos;;;;;
+12/03/2025;compra;HGLG11;fii;20;158,40;;0;;BTG Pactual;;;;;
+14/04/2025;provento;HGLG11;fii;;;;;22,00;BTG Pactual;;;;rendimento;
+31/02/2025;compra;PETR4;acao;1;10;;;;XP Investimentos;;;;;
+10/03/2025;troca;PETR4;acao;1;10;;;;XP Investimentos;;;;;
+11/03/2025;compra;PETR4;acao;1;10;;;;Corretora Que Nao Existe;;;;;
+12/03/2025;compra;PETR4;acao;1;10;;;;XP Investimentos;;;;;contato 123.456.789-00

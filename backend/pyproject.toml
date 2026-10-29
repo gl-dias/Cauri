@@ -11,6 +11,7 @@ dev = [
   "mypy>=1.18",
   "pytest>=8.4",
   "ruff>=0.13",
+  "types-openpyxl==3.1.5.20260827",
   "types-pyyaml>=6.0",
 ]
 
@@ -27,6 +28,7 @@ known-first-party = ["cauri_*", "conftest", "engine_factories"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["RUF012"]
+"**/tests/fixtures/*.py" = ["E501"]  # tabelas de dados fictícios leem melhor numa linha só
 
 [tool.mypy]
 strict = true
@@ -56,6 +58,7 @@ root_packages = [
   "cauri_engine",
   "cauri_ledger",
   "cauri_manual_entry",
+  "cauri_importers",
   "cauri_ingest_market",
   "cauri_api",
   "cauri_jobs",
@@ -66,7 +69,7 @@ name = "Camadas: apps > canais de entrada > ledger > engine > storage > core"
 type = "layers"
 layers = [
   "cauri_api | cauri_jobs",
-  "cauri_manual_entry | cauri_ingest_market",
+  "cauri_manual_entry | cauri_importers | cauri_ingest_market",
   "cauri_ledger",
   "cauri_engine",
   "cauri_storage",
@@ -82,7 +85,7 @@ forbidden_modules = ["cauri_ledger", "cauri_engine"]
 [[tool.importlinter.contracts]]
 name = "Canais de entrada só chegam ao banco pelo ledger"
 type = "forbidden"
-source_modules = ["cauri_manual_entry"]
+source_modules = ["cauri_manual_entry", "cauri_importers"]
 forbidden_modules = ["cauri_storage", "psycopg"]
 allow_indirect_imports = true  # via ledger pode; direto, não
 
