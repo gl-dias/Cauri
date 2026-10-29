@@ -1,0 +1,37 @@
+# API do Cauri na VPS. Fica em /opt/cauri/docker-compose.yml, ao lado do .env.
+# A porta só escuta em 127.0.0.1: quem fala com a internet é o Nginx (com TLS do Certbot).
+#
+# Variáveis lidas na hora do `docker compose` (podem ficar no próprio .env):
+#   GHCR_OWNER     dono da imagem no GHCR (usuário ou organização do GitHub)
+#   CAURI_API_TAG  tag da imagem; o deploy automático usa o SHA do commit
+
+services:
+  api:
+    image: ghcr.io/${GHCR_OWNER:?defina GHCR_OWNER}/cauri-api:${CAURI_API_TAG:-latest}
+    container_name: cauri-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: "8000"
+    ports:
+      - "127.0.0.1:8010:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true

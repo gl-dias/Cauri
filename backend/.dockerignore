@@ -1,0 +1,15 @@
+# Contexto de build = backend/. Só entra o que a imagem da API precisa.
+.venv
+**/__pycache__
+**/*.py[cod]
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.hypothesis
+**/tests
+conftest.py
+.cache
+.env
+.env.*
+**/Dockerfile
+.dockerignore
