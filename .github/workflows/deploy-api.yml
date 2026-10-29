@@ -100,7 +100,7 @@ jobs:
         env:
           API_URL: ${{ vars.API_URL }}
         run: |
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             if curl -fsS "$API_URL/health"; then exit 0; fi
             sleep 3
           done
