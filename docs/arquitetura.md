@@ -209,12 +209,12 @@ imports.profiles (id, user_id, name, mapping jsonb, options jsonb, created_at, u
 -- (depósito ou saque lido do arquivo, que explica saldo que falta)
 
 -- assistant (por usuário)
-assistant.conversations  (id, user_id, title, created_at)
-assistant.messages       (id, conversation_id, user_id, role, content, input_mode 'text'|'voice',
-                          llm_model, llm_output jsonb, created_at)
-assistant.proposals      (id, message_id, user_id, status 'pending'|'confirmed'|'cancelled')
-assistant.proposal_items (id, proposal_id, user_id, resolved jsonb, pending_question,
-                          price_is_suggested, movement_id → ledger.movements)
+assistant.conversations  (id, user_id, title, created_at, updated_at)
+assistant.messages       (id, conversation_id, user_id, role, content, input_mode 'texto'|'voz',
+                          llm_model, llm_output jsonb, created_at)   -- llm_output: só a frase entendida
+assistant.proposals      (id, message_id, user_id, status 'pending'|'confirmed'|'cancelled',
+                          items jsonb, suggestions jsonb, created_at, finished_at)
+                          -- itens do cartão em jsonb: poucos, e mudam juntos a cada resposta
 
 -- engine (por usuário)
 engine.position_snapshots  (user_id, snap_date, asset_id|instrument_id, broker_id, quantity,
@@ -424,7 +424,7 @@ Fase 3, screenshots de cada tela em desktop e celular.
 4. **Importação:** importers (B3 Negociação e Movimentação, template genérico e o
    export da exchange de cripto; corretoras individuais só se a B3 não cobrir algo), tela
    Importar, reconciliação entre origens, vitrine estática no `/demo`.
-5. **Assistente:** `nl_assistant`, tela Assistente com texto e voz, vitrine estática no
+5. **Assistente (entregue):** `nl_assistant`, tela Assistente com texto e voz, vitrine estática no
    `/demo`.
 6. **Deploy final:** Cloudflare Pages, Supabase em produção, API na VPS via GitHub
    Actions, README de portfólio.
@@ -647,6 +647,39 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
   O apelido da contraparte e o número da ordem nunca são lidos.
 - **Saldo inicial também no lançamento manual** (tipo "Saldo inicial") e nos templates
   (`saldo_inicial` no de bolsa, `saldo inicial` no de cripto e nos perfis).
+
+### Assistente (Fase 5)
+
+- **O LLM só extrai a frase.** Haiku (`claude-haiku-5-5`, configurável) com saída
+  estruturada por ferramenta obrigatória, devolvendo para cada operação {tipo, ativo como
+  falado, quantidade, preço, moeda, data}, com números como texto decimal (nunca float). O
+  pedido leva só a frase e a data de hoje: nada da carteira. Uma nova tentativa em
+  sobrecarga, nunca mais que isso.
+- **Resolução em Python determinístico:** ticker escrito vale direto; apelido aponta para
+  um emissor ou um ativo ("itau" é ITUB e "itausa" é ITSA, nunca se misturam); emissor com
+  mais de um ticker usa o único que o usuário tem, e pergunta se ele tem os dois ou nenhum.
+  Empresa com um ticker só não pergunta (não há ambiguidade). Tesouro pelo nome do título.
+- **Campos que faltam:** data vira hoje (o cartão avisa); preço vira o fechamento mais recente,
+  marcado como sugestão; corretora vira a única onde o ativo está, ou a mais recente da
+  classe, editável no cartão.
+- **Moeda estrangeira e cripto como na importação:** "a 120 mil dólares" converte pela PTAX de
+  venda do dia; pagar com USDT (ou outra cripto) gera a contrapartida no saldo dela.
+- **O cartão usa o mesmo `ledger.check`** do lançamento manual e da importação: erros,
+  duplicados prováveis (agrupados numa linha por origem e data) e venda descoberta, que vira
+  a mesma oferta de saldo inicial, dentro do cartão. Responder, editar, remover item ou
+  incluir saldo recalcula o cartão inteiro; "Confirmar" grava tudo ou nada, com origem "Chat"
+  e a mensagem como referência. Pendência (pergunta ou erro) impede confirmar.
+- **Voz:** o navegador grava e a API transcreve pelo Whisper da Groq; sem `GROQ_API_KEY`, o
+  front usa a Web Speech API do navegador. O texto volta para o campo e o usuário revisa antes
+  de enviar. O áudio não é guardado.
+- **Sem chave da Anthropic**, o assistente fica indisponível em produção. Em desenvolvimento e
+  nos testes ao vivo, `CAURI_ASSISTANT_EXTRACTOR=regras` usa um extrator por regras que
+  entende frases simples; a tela avisa que é o modo de desenvolvimento. O Haiku tem testes de
+  formato com HTTP simulado e um teste opcional de verdade (`just test-llm`).
+- **Tela:** conversas à esquerda, conversa ao centro com os cartões, resumo da carteira à
+  direita (só na tela; nunca vai para a IA). No `/demo`, uma conversa gravada.
+- **Conversão de moeda e saldo inicial sugerido foram para o `ledger`** (`ledger.fx`,
+  `ledger.opening`): importação e assistente são canais irmãos e não importam um ao outro.
 
 ### Template de cripto
 
