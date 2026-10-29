@@ -1,0 +1,65 @@
+name: Preparar produção
+
+# Roda à mão, uma vez, depois das migrations: cadastro de referência, ativos da B3 e do
+# Tesouro, carteira demo, admin inicial (ADMIN_EMAIL) e histórico de preços. Tudo é
+# idempotente: rodar de novo só atualiza.
+
+on:
+  workflow_dispatch:
+    inputs:
+      steps:
+        description: Etapas
+        type: choice
+        options: [tudo, so-admin, so-backfill]
+        default: tudo
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-prod
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Cadastro, demo, admin e histórico
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    env:
+      CAURI_INGEST_DATABASE_URL: ${{ secrets.CAURI_INGEST_DATABASE_URL }}
+      CAURI_ADMIN_DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      BRAPI_API_KEY: ${{ secrets.BRAPI_API_KEY }}
+      COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+      STEPS: ${{ inputs.steps }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.13.6"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Instala os jobs
+        working-directory: backend
+        run: uv sync --frozen --no-dev --package cauri-jobs
+
+      - name: Cadastro, ativos e demo
+        if: inputs.steps == 'tudo'
+        working-directory: backend
+        run: |
+          uv run --no-sync cauri-jobs sync-reference
+          uv run --no-sync cauri-jobs sync-assets
+          uv run --no-sync cauri-jobs seed-demo
+
+      - name: Admin inicial
+        if: inputs.steps != 'so-backfill'
+        working-directory: backend
+        run: uv run --no-sync cauri-jobs bootstrap-admin
+
+      - name: Histórico de preços e indicadores
+        if: inputs.steps != 'so-admin'
+        working-directory: backend
+        run: uv run --no-sync cauri-jobs backfill

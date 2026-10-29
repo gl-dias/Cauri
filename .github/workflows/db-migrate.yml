@@ -1,0 +1,52 @@
+name: Migrations em produção
+
+# Aplica no Supabase de produção as migrations que ainda não rodaram (supabase db push).
+# Só o que está em supabase/migrations; o seed.sql (senhas locais) nunca vai.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/db-migrate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: supabase db push
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Banco configurado?
+        id: guard
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::notice::Sem SUPABASE_DB_URL nos secrets: banco de produção ainda não configurado."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+
+      - uses: supabase/setup-cli@v3
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          version: 2.122.0
+
+      - name: O que vai rodar
+        if: steps.guard.outputs.skip != 'true'
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+
+      - name: Aplica
+        if: steps.guard.outputs.skip != 'true'
+        run: supabase db push --db-url "$SUPABASE_DB_URL"

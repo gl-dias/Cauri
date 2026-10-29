@@ -1,0 +1,98 @@
+name: Monitoramento
+
+# Abre (ou atualiza) uma issue quando:
+# - o job diário de mercado falha;
+# - faltam fechamentos da B3 em 2 pregões seguidos (conferido de manhã, nos dias úteis).
+# Uma issue aberta por problema: se ela já existe, ganha um comentário em vez de outra.
+
+on:
+  workflow_run:
+    workflows: ["Mercado diário"]
+    types: [completed]
+  schedule:
+    - cron: "0 12 * * 1-5" # 9h em Brasília, antes do pregão
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  job-falhou:
+    name: Job diário falhou
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Abre ou comenta a issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          title="Job diário de mercado falhou"
+          body="O workflow **Mercado diário** falhou: $RUN_URL"
+          gh label create monitoramento --color B60205 --description "Alerta automático" 2>/dev/null || true
+          number=$(gh issue list --label monitoramento --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+          else
+            gh issue create --title "$title" --label monitoramento --body "$body"
+          fi
+
+  sem-fechamento:
+    name: Fechamento da B3 em dia
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CAURI_INGEST_DATABASE_URL: ${{ secrets.CAURI_INGEST_DATABASE_URL }}
+    steps:
+      - name: Banco configurado?
+        id: guard
+        run: |
+          if [ -z "$CAURI_INGEST_DATABASE_URL" ]; then
+            echo "::notice::Sem CAURI_INGEST_DATABASE_URL nos secrets. Nada a conferir."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+
+      - uses: astral-sh/setup-uv@v10.3.0
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          version: "0.13.6"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Confere
+        id: health
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: backend
+        run: |
+          uv sync --frozen --no-dev --package cauri-jobs
+          if message=$(uv run --no-sync cauri-jobs health --business-days 2); then
+            echo "$message"
+          else
+            echo "$message"
+            {
+              echo "stale=true"
+              echo "message=$message"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Abre ou comenta a issue
+        if: steps.health.outputs.stale == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          MESSAGE: ${{ steps.health.outputs.message }}
+        run: |
+          title="Sem fechamento da B3 há 2 pregões ou mais"
+          gh label create monitoramento --color B60205 --description "Alerta automático" 2>/dev/null || true
+          number=$(gh issue list --label monitoramento --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$MESSAGE"
+          else
+            gh issue create --title "$title" --label monitoramento --body "$MESSAGE"
+          fi

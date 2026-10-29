@@ -1,0 +1,108 @@
+name: Deploy da API
+
+# Push na main que mexe no backend: builda a imagem, publica no GHCR e atualiza a VPS
+# por SSH. O environment "production" pode exigir aprovação manual (configurar no GitHub).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Imagem e VPS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/cauri-api
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+    steps:
+      # Até a VPS estar configurada, o workflow roda e sai sem erro.
+      - name: VPS configurada?
+        id: guard
+        run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "::notice::Sem VPS_HOST nos secrets: deploy ainda não configurado."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+
+      - uses: docker/setup-buildx-action@v4.4.1
+        if: steps.guard.outputs.skip != 'true'
+
+      - uses: docker/login-action@v4.6.0
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push
+        if: steps.guard.outputs.skip != 'true'
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: backend
+          file: backend/apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Chave SSH
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # O token do próprio job serve para a VPS baixar a imagem privada e expira com ele.
+      - name: Atualiza a VPS
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          TAG: ${{ github.sha }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" \
+            "set -eu
+             cd /opt/cauri
+             docker login ghcr.io -u '$GHCR_USER' --password-stdin
+             sed -i 's/^CAURI_API_TAG=.*/CAURI_API_TAG=$TAG/' .env
+             docker compose pull api
+             docker compose up -d api
+             docker logout ghcr.io
+             docker image prune -f >/dev/null"
+
+      - name: Saúde da API
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "$API_URL/health"; then exit 0; fi
+            sleep 3
+          done
+          echo "::error::A API não respondeu em $API_URL/health"
+          exit 1
