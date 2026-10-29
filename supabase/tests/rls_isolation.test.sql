@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(47);
+select plan(52);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -73,6 +73,9 @@ values ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-0000000
 insert into imports.rows (file_id, user_id, position, line_numbers, raw, status)
 values ('20000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a', 0, '{2}',
         '{"ativo": "AAAA3"}', 'error');
+insert into imports.profiles (user_id, name, mapping, options)
+values ('00000000-0000-4000-8000-00000000000a', 'Corretora da Ana',
+        '{"data": "Data", "tipo": "Operação", "ativo": "Papel"}', '{"broker_id": "corretora-a"}');
 
 -- ana (membro, admin) ---------------------------------------------------------------
 set local role authenticated;
@@ -94,6 +97,7 @@ select is((select count(*)::int from market.assets where ticker in ('AAAA3', 'BB
 select is((select count(*)::int from imports.rows), 1, 'ana vê as linhas da própria importação');
 select throws_ok($$delete from imports.batches$$, '42501', null,
   'ninguém apaga lote de importação (descartar é mudar o status)');
+select is((select count(*)::int from imports.profiles), 1, 'ana vê o próprio perfil de importação');
 
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
@@ -127,6 +131,12 @@ select is((select count(*)::int from imports.batches) + (select count(*)::int fr
 select throws_ok(
   $$insert into imports.batches (user_id) values ('00000000-0000-4000-8000-00000000000a')$$,
   '42501', null, 'bruno não cria lote de importação em nome da ana');
+select is((select count(*)::int from imports.profiles), 0, 'bruno não vê o perfil da ana');
+select throws_ok(
+  $$insert into imports.profiles (user_id, name, mapping) values
+    ('00000000-0000-4000-8000-00000000000a', 'Intruso', '{}')$$,
+  '42501', null, 'bruno não cria perfil em nome da ana');
+delete from imports.profiles where name = 'Corretora da Ana';
 
 reset role;
 
@@ -182,6 +192,7 @@ select is((select count(*)::int from marts.positions_current where user_id <> ap
 select throws_ok($$select count(*) from app.allowlist$$, '42501', null, 'anon não lê a allowlist');
 select throws_ok($$select count(*) from marts.job_runs$$, '42501', null, 'anon não lê o log de jobs');
 select throws_ok($$select count(*) from imports.rows$$, '42501', null, 'anon não alcança as importações');
+select throws_ok($$select count(*) from imports.profiles$$, '42501', null, 'anon não alcança os perfis');
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
     values ('00000000-0000-4000-8000-0000000000dd', date '2026-03-02', '10000000-0000-4000-8000-000000000004',
@@ -189,6 +200,9 @@ select throws_ok(
   '42501', null, 'anon não grava nada, nem no demo');
 
 reset role;
+
+select is((select count(*)::int from imports.profiles where name = 'Corretora da Ana'), 1,
+  'bruno não apaga o perfil da ana');
 
 -- Defesa no banco: CPF formatado não entra no raw de uma linha importada.
 select throws_ok(
