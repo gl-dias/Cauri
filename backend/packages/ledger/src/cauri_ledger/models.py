@@ -55,6 +55,17 @@ class MovementDraft:
     income_kind: IncomeKind | None = None
     notes: str | None = None
     origin_label: str | None = None  # sobrepõe o rótulo do envio ("B3", "Planilha")
+    # Operação em outra moeda (cripto em USDT, BTC...), já convertida para reais acima.
+    # orig_value é o preço unitário (compra e venda) ou o valor (provento) na moeda original;
+    # fx_rate, quantos reais vale 1 unidade da moeda em fx_date (PTAX de venda ou fechamento).
+    orig_currency: str | None = None
+    orig_value: Decimal | None = None
+    fx_rate: Decimal | None = None
+    fx_date: date | None = None
+    fx_source: str | None = None  # "ptax" | "fechamento"
+    # Taxa como foi paga (0,0001 BNB), já convertida e somada em ``fees``.
+    fee_asset: str | None = None
+    fee_quantity: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)

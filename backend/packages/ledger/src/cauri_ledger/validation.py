@@ -148,6 +148,18 @@ def check_shape(draft: MovementDraft, today: date) -> list[Issue]:
                 Issue(IssueCode.INVALID, f"Casas decimais demais (máximo {places}).", name)
             )
 
+    fx = (draft.orig_currency, draft.orig_value, draft.fx_rate, draft.fx_date, draft.fx_source)
+    if any(v is not None for v in fx) and any(v is None for v in fx):
+        issues.append(Issue(IssueCode.INVALID, "Conversão de moeda incompleta.", "fx_rate"))
+    if draft.fx_rate is not None and draft.fx_rate <= 0:
+        issues.append(Issue(IssueCode.INVALID, "Cotação de conversão inválida.", "fx_rate"))
+    if draft.fx_source is not None and draft.fx_source not in {"ptax", "fechamento"}:
+        issues.append(Issue(IssueCode.INVALID, "Fonte de cotação desconhecida.", "fx_source"))
+    if (draft.fee_asset is None) != (draft.fee_quantity is None) or (
+        draft.fee_quantity is not None and draft.fee_quantity <= 0
+    ):
+        issues.append(Issue(IssueCode.INVALID, "Taxa em outro ativo incompleta.", "fee_asset"))
+
     fi = draft.fixed_income
     if fi is not None:
         if not fi.issuer_name.strip():

@@ -83,6 +83,32 @@ def _catalog(row: Mapping[str, Any]) -> CatalogAsset:
     )
 
 
+def indicator_values(conn: Conn, series: str, since: date, until: date) -> dict[date, Decimal]:
+    rows = conn.execute(
+        "select ref_date, value from market.indicators"
+        " where series = %s and ref_date between %s and %s",
+        [series, since, until],
+    ).fetchall()
+    return {r["ref_date"]: r["value"] for r in rows}
+
+
+def closes_brl(
+    conn: Conn, tickers: Collection[str], since: date, until: date
+) -> dict[str, dict[date, Decimal]]:
+    if not tickers:
+        return {}
+    rows = conn.execute(
+        "select a.ticker, p.price_date, p.close from market.prices_daily p"
+        " join market.assets a on a.id = p.asset_id"
+        " where a.ticker = any(%s) and p.currency = 'BRL' and p.price_date between %s and %s",
+        [list(tickers), since, until],
+    ).fetchall()
+    out: dict[str, dict[date, Decimal]] = {}
+    for r in rows:
+        out.setdefault(r["ticker"], {})[r["price_date"]] = r["close"]
+    return out
+
+
 def all_brokers(conn: Conn) -> dict[str, str]:
     rows = conn.execute("select id, name from market.brokers order by name").fetchall()
     return {r["id"]: r["name"] for r in rows}

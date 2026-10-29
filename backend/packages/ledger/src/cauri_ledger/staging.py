@@ -83,9 +83,78 @@ class BatchSummary:
     imported: int
 
 
+@dataclass(frozen=True, slots=True)
+class ImportProfile:
+    """Mapeamento de colunas salvo pelo usuário para um formato que o Cauri não conhecia.
+
+    ``mapping``: campo do ledger -> nome da coluna no arquivo. ``options``: corretora fixa,
+    formato de data e de número, moeda padrão. Nunca guarda conteúdo do arquivo.
+    """
+
+    id: UUID
+    name: str
+    mapping: Mapping[str, str]
+    options: Mapping[str, Any]
+    created_at: datetime
+    last_used_at: datetime | None
+
+
 class ImportStore:
     def __init__(self, conn: Conn) -> None:
         self._conn = conn
+
+    # Perfis -------------------------------------------------------------------------
+
+    def profiles(self, user_id: UUID) -> list[ImportProfile]:
+        rows = self._conn.execute(
+            "select id, name, mapping, options, created_at, last_used_at from imports.profiles"
+            " where user_id = %s order by coalesce(last_used_at, created_at) desc, name",
+            [user_id],
+        ).fetchall()
+        return [
+            ImportProfile(
+                id=r["id"],
+                name=r["name"],
+                mapping=r["mapping"],
+                options=r["options"],
+                created_at=r["created_at"],
+                last_used_at=r["last_used_at"],
+            )
+            for r in rows
+        ]
+
+    def save_profile(
+        self, user_id: UUID, name: str, mapping: Mapping[str, str], options: Mapping[str, Any]
+    ) -> UUID:
+        """Cria o perfil, ou atualiza o de mesmo nome."""
+        row = self._conn.execute(
+            "insert into imports.profiles (user_id, name, mapping, options)"
+            " values (%s, %s, %s, %s)"
+            " on conflict (user_id, name) do update set mapping = excluded.mapping,"
+            "   options = excluded.options, updated_at = now()"
+            " returning id",
+            [user_id, name.strip(), Jsonb(dict(mapping)), Jsonb(dict(options))],
+        ).fetchone()
+        assert row is not None
+        profile_id: UUID = row["id"]
+        return profile_id
+
+    def delete_profile(self, user_id: UUID, profile_id: UUID) -> bool:
+        row = self._conn.execute(
+            "delete from imports.profiles where user_id = %s and id = %s returning id",
+            [user_id, profile_id],
+        ).fetchone()
+        return row is not None
+
+    def touch_profiles(self, user_id: UUID, ids: Sequence[UUID]) -> None:
+        if ids:
+            self._conn.execute(
+                "update imports.profiles set last_used_at = now()"
+                " where user_id = %s and id = any(%s)",
+                [user_id, list(ids)],
+            )
+
+    # Lotes --------------------------------------------------------------------------
 
     def create_batch(self, user_id: UUID, warnings: Sequence[str]) -> UUID:
         row = self._conn.execute(

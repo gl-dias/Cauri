@@ -12,6 +12,7 @@ from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -443,6 +444,13 @@ class Ledger:
                     "origin_label": d.origin_label or origin_label or _ORIGIN_LABELS[origin],
                     "idempotency_key": d.idempotency_key,
                     "notes": d.notes,
+                    "orig_currency": d.orig_currency,
+                    "orig_value": d.orig_value,
+                    "fx_rate": d.fx_rate,
+                    "fx_date": d.fx_date,
+                    "fx_source": d.fx_source,
+                    "fee_asset": d.fee_asset,
+                    "fee_quantity": d.fee_quantity,
                 },
             )
             if new_id is None:
@@ -498,6 +506,16 @@ class Ledger:
     def brokers(self) -> dict[str, str]:
         """Corretoras cadastradas: id -> nome."""
         return repo.all_brokers(self._conn)
+
+    def indicator(self, series: str, since: date, until: date) -> dict[date, Decimal]:
+        """Valores de uma série do BCB (CDI, PTAX_VENDA...) no intervalo."""
+        return repo.indicator_values(self._conn, series, since, until)
+
+    def closes(
+        self, tickers: Collection[str], since: date, until: date
+    ) -> dict[str, dict[date, Decimal]]:
+        """Fechamentos em reais por ativo e dia (cripto: CoinGecko)."""
+        return repo.closes_brl(self._conn, {t.strip().upper() for t in tickers}, since, until)
 
     def timeline(
         self, user_id: UUID, tickers: Collection[str]

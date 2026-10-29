@@ -32,6 +32,7 @@ from cauri_ledger.service import Ledger
 from cauri_ledger.staging import (
     BatchSummary,
     Decision,
+    ImportProfile,
     ImportStore,
     RowStatus,
     StagedFile,
@@ -48,6 +49,7 @@ __all__ = [
     "DraftCheck",
     "DuplicateCandidate",
     "FixedIncomeDraft",
+    "ImportProfile",
     "ImportStore",
     "Issue",
     "IssueCode",
