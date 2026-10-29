@@ -1,0 +1,46 @@
+# Apelidos que o assistente usa para achar o ativo a partir do que o usuário disse.
+#
+# Regra: um apelido aponta para UM emissor (raiz de 4 letras do ticker na B3) ou para UM
+# ativo (cripto). Empresas diferentes nunca dividem apelido: "itau" é o Itaú Unibanco
+# (ITUB3, ITUB4) e "itausa" é a Itaúsa (ITSA3, ITSA4). Qual ticker do emissor usar
+# (PETR3 ou PETR4) é decidido depois, pela carteira do usuário, nunca aqui.
+#
+# Os apelidos são normalizados ao carregar (minúsculas, sem acento, espaços simples),
+# então "Itaú" e "itau" são o mesmo apelido. Tickers (PETR4, HGLG11) não precisam de
+# apelido: são reconhecidos direto.
+issuers:
+  PETR: [petrobras, petro]
+  VALE: [vale]
+  ITUB: [itau, itau unibanco, unibanco]
+  ITSA: [itausa]
+  BBAS: [banco do brasil, bb]
+  BBSE: [bb seguridade]
+  BBDC: [bradesco]
+  SANB: [santander]
+  BPAC: [btg pactual]
+  B3SA: [b3]
+  WEGE: [weg]
+  ABEV: [ambev]
+  MGLU: [magalu, magazine luiza]
+  ELET: [eletrobras]
+  TAEE: [taesa]
+  EGIE: [engie]
+  CMIG: [cemig]
+  SBSP: [sabesp]
+  SUZB: [suzano]
+  RENT: [localiza]
+  RADL: [raia drogasil, raia]
+  PRIO: [prio, petrorio]
+  GGBR: [gerdau]
+  VIVT: [vivo, telefonica]
+  EMBR: [embraer]
+  JBSS: [jbs]
+  CSAN: [cosan]
+  KLBN: [klabin]
+assets:
+  BTC: [bitcoin]
+  ETH: [ethereum, ether]
+  SOL: [solana]
+  XRP: [ripple]
+  ADA: [cardano]
+  DOGE: [dogecoin]

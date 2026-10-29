@@ -1,0 +1,16 @@
+# Criptoativos disponíveis. ticker é o código no Cauri; coingecko é o id na API do CoinGecko
+# (preço em BRL e USD). Para incluir outra cripto, adicione aqui e rode `cauri-jobs sync-reference`.
+- {ticker: BTC, name: Bitcoin, coingecko: bitcoin}
+- {ticker: ETH, name: Ethereum, coingecko: ethereum}
+- {ticker: SOL, name: Solana, coingecko: solana}
+- {ticker: XRP, name: XRP, coingecko: ripple}
+- {ticker: BNB, name: BNB, coingecko: binancecoin}
+- {ticker: ADA, name: Cardano, coingecko: cardano}
+- {ticker: DOGE, name: Dogecoin, coingecko: dogecoin}
+- {ticker: AVAX, name: Avalanche, coingecko: avalanche-2}
+- {ticker: LINK, name: Chainlink, coingecko: chainlink}
+- {ticker: DOT, name: Polkadot, coingecko: polkadot}
+- {ticker: LTC, name: Litecoin, coingecko: litecoin}
+- {ticker: POL, name: POL (ex-MATIC), coingecko: polygon-ecosystem-token}
+- {ticker: USDT, name: Tether, coingecko: tether}
+- {ticker: USDC, name: USD Coin, coingecko: usd-coin}

@@ -1,0 +1,18 @@
+[project]
+name = "cauri-ingest-market"
+version = "0.1.0"
+description = "Ingestão de dados de mercado (diário e histórico)"
+requires-python = ">=3.13"
+dependencies = [
+  "cauri-core",
+  "cauri-storage",
+  "httpx>=0.28",
+]
+
+[tool.uv.sources]
+cauri-core = { workspace = true }
+cauri-storage = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"

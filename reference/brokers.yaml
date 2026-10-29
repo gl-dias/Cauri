@@ -1,0 +1,21 @@
+# Corretoras, bancos e exchanges disponíveis no cadastro de movimentações.
+# id é o slug gravado no ledger (não muda depois de usado); name é o que aparece na tela.
+# Carregado por `cauri-jobs sync-reference`.
+- {id: xp, name: XP Investimentos, kind: corretora}
+- {id: rico, name: Rico, kind: corretora}
+- {id: clear, name: Clear, kind: corretora}
+- {id: btg, name: BTG Pactual, kind: corretora}
+- {id: genial, name: Genial Investimentos, kind: corretora}
+- {id: toro, name: Toro Investimentos, kind: corretora}
+- {id: agora, name: Ágora Investimentos, kind: corretora}
+- {id: nubank, name: Nubank, kind: banco}
+- {id: inter, name: Banco Inter, kind: banco}
+- {id: c6, name: C6 Bank, kind: banco}
+- {id: itau, name: Itaú, kind: banco}
+- {id: bradesco, name: Bradesco, kind: banco}
+- {id: santander, name: Santander, kind: banco}
+- {id: bb, name: Banco do Brasil, kind: banco}
+- {id: caixa, name: Caixa, kind: banco}
+- {id: binance, name: Binance, kind: exchange}
+- {id: mercado-bitcoin, name: Mercado Bitcoin, kind: exchange}
+- {id: coinbase, name: Coinbase, kind: exchange}
