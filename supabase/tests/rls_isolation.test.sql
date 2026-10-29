@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(34);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -53,6 +53,11 @@ values
   ('00000000-0000-4000-8000-0000000000dd', date '2026-03-01', '10000000-0000-4000-8000-000000000004',
    'compra', 100, 10, 'corretora-demo', 'manual', 'fixture-demo-1');
 
+insert into engine.bucket_snapshots (user_id, snap_date, bucket_kind, bucket_key, market_value, cost_basis, net_flows, quota_value)
+values
+  ('00000000-0000-4000-8000-00000000000a', date '2026-10-01', 'class', 'acao', 330, 310, 0, 1.06),
+  ('00000000-0000-4000-8000-0000000000dd', date '2026-10-01', 'class', 'acao', 1100, 1000, 0, 1.1);
+
 insert into engine.portfolio_snapshots (user_id, snap_date, market_value, cost_basis, net_flows, quota_value, cdi_index, ipca_index)
 values
   ('00000000-0000-4000-8000-00000000000a', date '2026-10-01', 330, 310, 0, 1.06, 1.1, 1.04),
@@ -68,6 +73,7 @@ select is((select count(*)::int from ledger.movements where user_id <> auth.uid(
   'ana não vê movimentações de outros');
 select is((select count(*)::int from marts.movements), 2, 'marts.movements da ana tem só as dela');
 select is((select count(*)::int from engine.portfolio_snapshots), 1, 'ana vê só o próprio snapshot');
+select is((select count(*)::int from engine.bucket_snapshots), 1, 'ana vê só os próprios snapshots por classe');
 select is((select count(*)::int from app.allowlist where email like '%@example.test' and email in ('ana@example.test', 'bruno@example.test')), 2,
   'admin lê a allowlist');
 select is((select role from marts.me), 'admin', 'marts.me da ana diz admin');
@@ -139,6 +145,8 @@ select is((select array_agg(ticker)::text from market.assets), '{DDDD3}',
   'anon só vê ativos da carteira demo (a lista rastreada vazaria carteiras reais)');
 select is((select count(*)::int from market.brokers), 1, 'anon só vê corretoras usadas pelo demo');
 select is((select count(*)::int from engine.portfolio_snapshots), 1, 'anon vê só o snapshot do demo');
+select is((select count(*)::int from engine.bucket_snapshots where user_id <> app.demo_user_id()), 0,
+  'anon não vê snapshot por classe de carteira real');
 select ok((select count(*) from market.indicators) > 0, 'anon lê indicadores públicos');
 select is((select display_name from marts.me), 'Investidor Demo', 'marts.me do anon é o perfil demo');
 select throws_ok($$select count(*) from app.allowlist$$, '42501', null, 'anon não lê a allowlist');
