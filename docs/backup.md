@@ -16,15 +16,21 @@ Retenção de 8 semanas; arquivos e pasta só legíveis pelo root (600 e 700).
 
 ## Instalação na VPS
 
+Com os arquivos de `deploy/vps` copiados para `/tmp/cauri-vps` (passo 1 de
+`deploy/vps/README.md`):
+
 ```bash
-sudo mkdir -p /opt/cauri/backup /opt/cauri/backups
-sudo cp deploy/vps/backup/cauri-backup.sh /opt/cauri/backup/ && sudo chmod 700 /opt/cauri/backup/cauri-backup.sh
-sudo install -m 600 /dev/null /opt/cauri/backup.env
-# em /opt/cauri/backup.env:
-#   CAURI_BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<senha>@aws-0-sa-east-1.pooler.supabase.com:5432/postgres
-sudo cp deploy/vps/backup/cauri-backup.cron /etc/cron.d/cauri-backup
+SRC=/tmp/cauri-vps
+sudo install -d -o root -g root -m 700 /opt/cauri/backup /opt/cauri/backups
+sudo install -o root -g root -m 700 "$SRC/backup/cauri-backup.sh" /opt/cauri/backup/cauri-backup.sh
+sudo install -o root -g root -m 600 /dev/null /opt/cauri/backup.env
+sudo nano /opt/cauri/backup.env
+#   CAURI_BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<senha-do-banco>@<host-do-pooler>:5432/postgres
+sudo install -o root -g root -m 644 "$SRC/backup/cauri-backup.cron" /etc/cron.d/cauri-backup
 sudo /opt/cauri/backup/cauri-backup.sh   # primeira execução, para conferir
 ```
+
+O `backup.env` fica só com o root: o usuário `cauri-deploy` não lê a senha do dono do banco.
 
 O script roda o `pg_dump` dentro do container `postgres:17-alpine` (mesma versão maior do
 Supabase), então a VPS só precisa do Docker.
@@ -67,4 +73,4 @@ precisam ser texto vazio (com nulo o Auth não acha a conta e o magic link falha
    banco: o script só aceita banco local, então para produção rode os mesmos comandos à mão
    (ou tire a trava conscientemente, num terminal só para isso).
 3. Senhas dos roles, URLs do Auth, hook e SMTP como em `docs/deploy.md`.
-4. Atualize os secrets e o `.env` da VPS com o novo projeto.
+4. Atualize os secrets do GitHub e o `api.env` da VPS com o novo projeto.

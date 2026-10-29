@@ -75,7 +75,9 @@ jobs:
           chmod 600 ~/.ssh/deploy
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      # O token do próprio job serve para a VPS baixar a imagem privada e expira com ele.
+      # A chave só roda /usr/local/bin/cauri-deploy na VPS (comando forçado no
+      # authorized_keys, ver deploy/vps/cauri-deploy.sh). O token do próprio job vai pelo
+      # stdin para a VPS baixar a imagem privada e expira com ele.
       - name: Atualiza a VPS
         if: steps.guard.outputs.skip != 'true'
         env:
@@ -86,14 +88,7 @@ jobs:
           GHCR_USER: ${{ github.actor }}
         run: |
           printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" \
-            "set -eu
-             cd /opt/cauri
-             docker login ghcr.io -u '$GHCR_USER' --password-stdin
-             sed -i 's/^CAURI_API_TAG=.*/CAURI_API_TAG=$TAG/' .env
-             docker compose pull api
-             docker compose up -d api
-             docker logout ghcr.io
-             docker image prune -f >/dev/null"
+            "deploy $TAG $GHCR_USER"
 
       - name: Saúde da API
         if: steps.guard.outputs.skip != 'true'

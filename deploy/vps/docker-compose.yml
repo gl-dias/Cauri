@@ -1,16 +1,18 @@
-# API do Cauri na VPS. Fica em /opt/cauri/docker-compose.yml, ao lado do .env.
+# API do Cauri na VPS. Fica em /opt/cauri/docker-compose.yml.
 # A porta só escuta em 127.0.0.1: quem fala com a internet é o Nginx (com TLS do Certbot).
 #
-# Variáveis lidas na hora do `docker compose` (podem ficar no próprio .env):
-#   GHCR_OWNER     dono da imagem no GHCR (usuário ou organização do GitHub)
-#   CAURI_API_TAG  tag da imagem; o deploy automático usa o SHA do commit
+# Dois arquivos ao lado dele:
+#   .env     lido pelo `docker compose`, sem segredo; o deploy reescreve a tag
+#              GHCR_OWNER     dono da imagem no GHCR (usuário ou organização do GitHub)
+#              CAURI_API_TAG  tag da imagem; o deploy automático usa o SHA do commit
+#   api.env  segredos e configuração da API (modelo na seção API do .env.example)
 
 services:
   api:
     image: ghcr.io/${GHCR_OWNER:?defina GHCR_OWNER}/cauri-api:${CAURI_API_TAG:-latest}
     container_name: cauri-api
     restart: unless-stopped
-    env_file: .env
+    env_file: api.env
     environment:
       PORT: "8000"
     ports:

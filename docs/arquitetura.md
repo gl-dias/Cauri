@@ -350,7 +350,7 @@ manual ──────► backfill.yml: histórico de preços, seed do demo, 
 - **Cloudflare Pages:** só a URL do Supabase, a chave publishable (pública por design,
   quem protege é o RLS) e a URL da API. O `_headers` define uma CSP que libera só
   Supabase e API.
-- **VPS (`/opt/cauri/.env`):** a connection string do `cauri_api`, `ANTHROPIC_API_KEY`,
+- **VPS (`/opt/cauri/api.env`):** a connection string do `cauri_api`, `ANTHROPIC_API_KEY`,
   `GROQ_API_KEY`, origens liberadas no CORS.
 - **GitHub secrets:** a connection string do `cauri_ingest`, `BRAPI_API_KEY`,
   `COINGECKO_API_KEY`, o token e a senha do banco para migration, `VPS_HOST`,
