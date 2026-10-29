@@ -5,10 +5,16 @@ em dólar e em stablecoins. Sai por volta das 13h dos dias úteis.
 
 Endpoint: https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados
 Séries diárias aceitam no máximo 10 anos por consulta; pedimos em janelas de 5.
+
+A API às vezes responde 200 com uma página HTML no lugar do JSON, ou 5xx. Cada janela tem
+três tentativas; se todas falharem, o erro diz o que veio (status, tipo e começo do corpo).
 """
 
 from __future__ import annotations
 
+import logging
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -20,6 +26,13 @@ from cauri_core.dates import SAO_PAULO, add_months
 from cauri_core.money import to_decimal
 
 URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{code}/dados"
+RETRY_WAITS_S = (3.0, 10.0)  # pausa antes da 2ª e da 3ª tentativa
+
+log = logging.getLogger("cauri.ingest")
+
+
+class SgsError(Exception):
+    """O SGS não devolveu a lista de pontos depois de todas as tentativas."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +59,12 @@ def parse(payload: list[dict[str, Any]]) -> list[tuple[date, Decimal]]:
 
 
 def fetch(
-    client: httpx.Client, series: Series, start: date, end: date
+    client: httpx.Client,
+    series: Series,
+    start: date,
+    end: date,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> tuple[list[tuple[date, Decimal]], list[dict[str, Any]]]:
     """Pontos da série no intervalo e as respostas cruas (para o raw)."""
     points: dict[date, Decimal] = {}
@@ -59,13 +77,56 @@ def fetch(
             "dataInicial": f"{window_start:%d/%m/%Y}",
             "dataFinal": f"{window_end:%d/%m/%Y}",
         }
-        response = client.get(URL.format(code=series.code), params=params, timeout=60)
-        if response.status_code == 404:  # janela sem dados
-            payload: list[dict[str, Any]] = []
-        else:
-            response.raise_for_status()
-            payload = response.json()
-        raw.append({"params": params, "status": response.status_code, "data": payload})
+        status, payload = _window(client, series, params, sleep)
+        raw.append({"params": params, "status": status, "data": payload})
         points.update(parse(payload))
         window_start = window_end + timedelta(days=1)
     return sorted(points.items()), raw
+
+
+def _window(
+    client: httpx.Client,
+    series: Series,
+    params: dict[str, str],
+    sleep: Callable[[float], None],
+) -> tuple[int, list[dict[str, Any]]]:
+    problem = ""
+    for attempt in range(len(RETRY_WAITS_S) + 1):
+        if attempt:
+            log.warning(
+                "SGS %s (%s): %s; tentando de novo em %.0f s",
+                series.name, series.code, problem, RETRY_WAITS_S[attempt - 1],
+            )  # fmt: skip
+            sleep(RETRY_WAITS_S[attempt - 1])
+        try:
+            response = client.get(URL.format(code=series.code), params=params, timeout=60)
+        except httpx.TransportError as exc:
+            problem = f"sem resposta ({type(exc).__name__})"
+            continue
+        if response.status_code == 404:  # janela sem dados
+            return 404, []
+        if response.is_success:
+            payload = _list(response)
+            if payload is not None:
+                return response.status_code, payload
+        elif response.status_code != 429 and response.status_code < 500:
+            response.raise_for_status()  # pedido errado: repetir não adianta
+        problem = _describe(response)
+    raise SgsError(
+        f"SGS {series.name} ({series.code}) de {params['dataInicial']} a"
+        f" {params['dataFinal']}: {problem}"
+    )
+
+
+def _list(response: httpx.Response) -> list[dict[str, Any]] | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    return payload if isinstance(payload, list) else None
+
+
+def _describe(response: httpx.Response) -> str:
+    kind = response.headers.get("content-type", "sem content-type")
+    start = " ".join(response.text[:160].split())
+    return f"respondeu {response.status_code} ({kind}) sem a lista de pontos: {start!r}"

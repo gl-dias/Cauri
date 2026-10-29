@@ -4,6 +4,7 @@ import zipfile
 from datetime import date
 from decimal import Decimal
 
+import httpx
 import pytest
 
 from cauri_ingest_market.reference import normalize_alias, sync_aliases
@@ -128,6 +129,77 @@ def test_series_do_bcb_corretas():
         433,
         1,  # PTAX de venda; a de compra é a 10813 (conferido na API: a 1 vem sempre maior)
     )
+
+
+SGS_HTML = "<html><body>The requested URL was rejected.</body></html>"
+SGS_JSON = [{"data": "27/10/2026", "valor": "0.050788"}]
+
+
+def _sgs_client(*responses: httpx.Response) -> tuple[httpx.Client, list[httpx.Request]]:
+    """Cliente que devolve as respostas na ordem e guarda os pedidos feitos."""
+    queue, requests = list(responses), []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return queue.pop(0)
+
+    return httpx.Client(transport=httpx.MockTransport(handler)), requests
+
+
+def _fetch_cdi(client: httpx.Client, waits: list[float]):
+    return bcb_sgs.fetch(
+        client, bcb_sgs.CDI, date(2026, 10, 1), date(2026, 10, 28), sleep=waits.append
+    )
+
+
+class TestSgsInstavel:
+    def test_html_no_lugar_do_json_tenta_de_novo(self):
+        client, requests = _sgs_client(
+            httpx.Response(200, text=SGS_HTML, headers={"content-type": "text/html"}),
+            httpx.Response(503, text="indisponível"),
+            httpx.Response(200, json=SGS_JSON),
+        )
+        waits: list[float] = []
+        points, raw = _fetch_cdi(client, waits)
+        assert points == [(date(2026, 10, 27), Decimal("0.050788"))]
+        assert len(requests) == 3
+        assert waits == list(bcb_sgs.RETRY_WAITS_S)
+        assert raw[0]["status"] == 200
+
+    def test_desiste_mostrando_o_que_veio(self):
+        client, _ = _sgs_client(
+            *[httpx.Response(200, text=SGS_HTML, headers={"content-type": "text/html"})] * 3
+        )
+        with pytest.raises(bcb_sgs.SgsError) as erro:
+            _fetch_cdi(client, [])
+        message = str(erro.value)
+        assert "CDI (12) de 01/10/2026 a 28/10/2026" in message
+        assert "respondeu 200 (text/html)" in message
+        assert "The requested URL was rejected" in message
+
+    def test_pedido_errado_nao_repete(self):
+        client, requests = _sgs_client(httpx.Response(400, text="data inválida"))
+        waits: list[float] = []
+        with pytest.raises(httpx.HTTPStatusError):
+            _fetch_cdi(client, waits)
+        assert (len(requests), waits) == (1, [])
+
+    def test_janela_sem_dados(self):
+        client, _ = _sgs_client(httpx.Response(404))
+        assert _fetch_cdi(client, []) == (
+            [],
+            [
+                {
+                    "params": {
+                        "formato": "json",
+                        "dataInicial": "01/10/2026",
+                        "dataFinal": "28/10/2026",
+                    },
+                    "status": 404,
+                    "data": [],
+                }
+            ],
+        )
 
 
 def test_coingecko_ponto_das_00h_utc_vira_fechamento_do_dia_anterior_em_brasilia():
