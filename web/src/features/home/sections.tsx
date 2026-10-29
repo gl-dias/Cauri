@@ -10,11 +10,11 @@ import {
   formatDayMonth,
   formatMonthYear,
   formatPct,
-  formatQuantity,
 } from "@/lib/format";
+import { assetInitials, describe, originText } from "@/lib/movements";
 import { tokens, type AssetClassKey } from "@/theme/tokens";
 import { CardHeader, GlassCard } from "@/ui/GlassCard";
-import { ProgressRing, Skeleton } from "@/ui/viz";
+import { AssetAvatar, ProgressRing, Skeleton } from "@/ui/viz";
 
 const classColor = (key: string) => tokens.assetClass[key as AssetClassKey]?.color ?? tokens.color.accent;
 const classLabel = (key: string) => tokens.assetClass[key as AssetClassKey]?.label ?? key;
@@ -157,30 +157,10 @@ export function AgendaPanel({ items }: { items: AgendaItem[] | undefined }) {
 
 /* Últimas movimentações ------------------------------------------------------------- */
 
-const TYPE_LABEL: Record<MovementRow["type"], string> = {
-  compra: "Compra",
-  venda: "Venda",
-  aporte: "Aporte",
-  resgate: "Resgate",
-  provento: "Provento",
-  desdobramento: "Desdobramento",
-  grupamento: "Grupamento",
-  bonificacao: "Bonificação",
-};
-
-function describe(m: MovementRow): string {
-  if (m.quantity !== null && (m.type === "compra" || m.type === "venda")) {
-    return `${TYPE_LABEL[m.type]} de ${formatQuantity(m.quantity)}`;
-  }
-  if (m.amount !== null) return `${TYPE_LABEL[m.type]} de ${formatBRL(m.amount)}`;
-  return TYPE_LABEL[m.type];
-}
-
 function OriginBadge({ m }: { m: MovementRow }) {
-  const text = m.origin === "import" ? (m.origin_label ?? "Planilha") : m.origin === "chat" ? "Chat" : "Manual";
   return (
     <span className="shrink-0 rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[11px] font-medium text-muted">
-      {text}
+      {originText(m)}
     </span>
   );
 }
@@ -199,16 +179,10 @@ export function RecentMovementsPanel({ items }: { items: MovementRow[] | undefin
         <ul className="divide-y divide-white/8">
           {items.map((m) => {
             const color = classColor(m.asset_class);
-            const short = m.asset_label.replace(/^(CDB|LCI|LCA)\s.*/, "$1").replace(/^TD-.*/, "TD").slice(0, 4);
+            const short = assetInitials(m.asset_label);
             return (
               <li key={m.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                <span
-                  className="grid size-10 shrink-0 place-items-center rounded-full text-[11px] font-bold tracking-tight"
-                  style={{ background: `color-mix(in srgb, ${color} 24%, transparent)`, color }}
-                  aria-hidden
-                >
-                  {short}
-                </span>
+                <AssetAvatar initials={short} color={color} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-medium">{m.asset_label}</div>
                   <div className="truncate text-[12px] text-muted">

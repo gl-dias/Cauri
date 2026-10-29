@@ -1,6 +1,7 @@
-import { Coins, Download, Scale, TrendingUp, Wallet } from "lucide-react";
+import { Coins, Download, Plus, Scale, TrendingUp, Wallet } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 
 import { useAgenda, useBuckets, useGoal, useMe, usePortfolioDaily, useRecentMovements, useSource } from "@/data/context";
 import { computeKpis, evolution, PERIODS, slicePeriod, type Period } from "@/data/metrics";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/format";
 import { tokens } from "@/theme/tokens";
 import { DeltaBadge, GlassButton, SegmentedControl } from "@/ui/controls";
+import { GlassCard } from "@/ui/GlassCard";
 import { KpiCard } from "@/ui/KpiCard";
 import { pageVariants, staticVariants } from "@/ui/motion";
 import { AnimatedNumber, Skeleton } from "@/ui/viz";
@@ -55,6 +57,32 @@ export function HomePage() {
   const kpis = useMemo(() => (daily.data ? computeKpis(daily.data, period) : null), [daily.data, period]);
   const points = useMemo(() => (daily.data ? evolution(daily.data, period) : undefined), [daily.data, period]);
   const firstName = me.data?.display_name.split(/\s+/)[0] ?? "";
+
+  // Carteira sem nenhum snapshot ainda (usuário novo): convite para o primeiro lançamento.
+  if (daily.data && daily.data.length === 0) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center">
+        <GlassCard lift={false} className="max-w-lg text-center">
+          <h1 className="text-[26px] font-semibold tracking-tight">
+            {greeting()}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="mt-2 text-[14px] text-muted">
+            Sua carteira ainda está vazia. Lance a primeira movimentação; os gráficos aparecem depois do próximo
+            fechamento do mercado.
+          </p>
+          {source.mode === "app" ? (
+            <Link
+              to="/app/lancamentos"
+              className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-[14px] font-semibold text-white hover:bg-primary-hover"
+            >
+              <Plus className="size-4" /> Primeiro lançamento
+            </Link>
+          ) : null}
+        </GlassCard>
+      </div>
+    );
+  }
 
   return (
     <motion.div
