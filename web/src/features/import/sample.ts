@@ -116,3 +116,44 @@ function countOf(rows: ImportRow[]): ImportBatch["counts"] {
   for (const r of rows) out[r.status] = (out[r.status] ?? 0) + 1;
   return out;
 }
+
+/** Saldo que falta: compra de BTC paga com USDT que veio de um depósito externo. */
+export const SAMPLE_SHORTFALL_BATCH: ImportBatch = (() => {
+  const deposit = row({
+    status: "ignored",
+    raw: { moeda: "USDT", quantidade: "150", data: "2026-09-01 10:00:00" },
+    messages: [
+      { level: "info", text: "Depósito de USDT: transferência de custódia, a quantidade total não muda." },
+      { level: "warning", text: "Este depósito explica o saldo de USDT que falta para as vendas a partir de 02/09/2026: veio de fora, então inclua um saldo inicial." },
+    ],
+  });
+  const buy = row({
+    status: "ok",
+    draft: draft({
+      trade_date: "2026-09-02", type: "compra", asset_label: "BTC", quantity: "0.0009", unit_price: "593536.368",
+      broker_id: "binance", broker_name: "Binance",
+      orig_currency: "USDT", orig_value: "111120", fx_rate: "5.3414", fx_date: "2026-09-02", fx_source: "ptax",
+    }),
+  });
+  const leg = row({
+    status: "error",
+    draft: draft({ trade_date: "2026-09-02", type: "venda", asset_label: "USDT", quantity: "100.008", unit_price: "5.3414", broker_id: "binance", broker_name: "Binance" }),
+    messages: [{ level: "error", text: "Venda maior que a posição de USDT em 02/09/2026 (disponível: 0)." }],
+  });
+  const files = [
+    { id: "00000000-0000-4000-8000-0000000000f4", label: "Binance · Depósitos e saques, 09/2026 a 09/2026", adapter: "binance-transferencias", rows: [deposit], counts: countOf([deposit]) },
+    { id: "00000000-0000-4000-8000-0000000000f5", label: "Binance · Trades (Spot), 09/2026 a 09/2026", adapter: "binance-trades", rows: [buy, leg], counts: countOf([buy, leg]) },
+  ];
+  return {
+    ...SAMPLE_BATCH,
+    id: "00000000-0000-4000-8000-0000000000b2",
+    files,
+    counts: countOf([deposit, buy, leg]),
+    suggestions: [
+      {
+        ticker: "USDT", broker_id: "binance", trade_date: "2026-09-01", quantity: "150", first_shortfall: "2026-09-02",
+        unit_cost: "5.3347", cost_note: "sugestão: PTAX de venda de 01/09/2026 (R$ 5,3347)", deposit: { quantity: "150", day: "2026-09-01" },
+      },
+    ],
+  };
+})();

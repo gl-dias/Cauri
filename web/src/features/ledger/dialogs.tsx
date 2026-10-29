@@ -124,20 +124,22 @@ type FormState = {
   fi_rate_pct: string;
   fi_maturity: string;
   notes: string;
+  opening: boolean; // saldo inicial: compra marcada, com o custo médio
 };
 
 function emptyForm(): FormState {
   return {
     type: "compra", trade_date: todaySP(), broker_id: "", ticker: "", quantity: "", unit_price: "", fees: "",
     amount: "", factor: "", income_kind: "dividendo", instrument_id: "", fi_kind: "CDB", fi_issuer: "",
-    fi_rate_pct: "", fi_maturity: "", notes: "",
+    fi_rate_pct: "", fi_maturity: "", notes: "", opening: false,
   };
 }
 
 function toEntry(f: FormState, clientKey: string): ManualEntry {
   const base: ManualEntry = { client_key: clientKey, type: f.type, trade_date: f.trade_date, broker_id: f.broker_id };
   const opt = (v: string) => (v.trim() ? v.trim() : undefined);
-  if (TRADE.includes(f.type)) Object.assign(base, { ticker: opt(f.ticker), quantity: opt(f.quantity), unit_price: opt(f.unit_price), fees: opt(f.fees) });
+  if (TRADE.includes(f.type)) Object.assign(base, { ticker: opt(f.ticker), quantity: opt(f.quantity), unit_price: opt(f.unit_price), fees: f.opening ? undefined : opt(f.fees) });
+  if (f.opening) base.opening_balance = true;
   if (f.type === "provento") Object.assign(base, { ticker: opt(f.ticker), amount: opt(f.amount), income_kind: f.income_kind });
   if (EVENTS.includes(f.type)) Object.assign(base, { ticker: opt(f.ticker), factor: opt(f.factor), unit_price: f.type === "bonificacao" ? opt(f.unit_price) ?? "0" : undefined });
   if (FIXED.includes(f.type)) {
@@ -229,10 +231,20 @@ export function ManualEntryDialog({ open, onClose }: { open: boolean; onClose: (
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Tipo" htmlFor="mov-tipo">
-          <SelectInput id="mov-tipo" value={t} onChange={(e) => set("type", e.target.value as MovementType)}>
+          <SelectInput
+            id="mov-tipo"
+            value={form.opening ? "saldo_inicial" : t}
+            onChange={(e) => {
+              // "Saldo inicial" é uma compra marcada: posição anterior ao histórico.
+              const opening = e.target.value === "saldo_inicial";
+              set("opening", opening);
+              set("type", opening ? "compra" : (e.target.value as MovementType));
+            }}
+          >
             {(Object.keys(TYPE_LABEL) as MovementType[]).map((k) => (
               <option key={k} value={k}>{TYPE_LABEL[k]}</option>
             ))}
+            <option value="saldo_inicial">Saldo inicial</option>
           </SelectInput>
         </Field>
         <Field label="Data" htmlFor="mov-data">
@@ -288,12 +300,18 @@ export function ManualEntryDialog({ open, onClose }: { open: boolean; onClose: (
             <Field label="Quantidade" htmlFor="mov-qtd">
               <TextInput id="mov-qtd" inputMode="decimal" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} placeholder="100" />
             </Field>
-            <Field label="Preço unitário (R$)" htmlFor="mov-preco">
+            <Field
+              label={form.opening ? "Custo médio (R$)" : "Preço unitário (R$)"}
+              htmlFor="mov-preco"
+              hint={form.opening ? "Posição que você já tinha antes do histórico" : undefined}
+            >
               <TextInput id="mov-preco" inputMode="decimal" value={form.unit_price} onChange={(e) => set("unit_price", e.target.value)} placeholder="38,45" />
             </Field>
-            <Field label="Taxas (R$)" htmlFor="mov-taxas" hint="Corretagem e emolumentos; entram no preço médio">
-              <TextInput id="mov-taxas" inputMode="decimal" value={form.fees} onChange={(e) => set("fees", e.target.value)} placeholder="0,00" />
-            </Field>
+            {form.opening ? null : (
+              <Field label="Taxas (R$)" htmlFor="mov-taxas" hint="Corretagem e emolumentos; entram no preço médio">
+                <TextInput id="mov-taxas" inputMode="decimal" value={form.fees} onChange={(e) => set("fees", e.target.value)} placeholder="0,00" />
+              </Field>
+            )}
           </>
         ) : null}
 

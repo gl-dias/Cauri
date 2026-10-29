@@ -104,6 +104,7 @@ export type MovementRow = {
   fx_source?: "ptax" | "fechamento" | null;
   fee_asset?: string | null;
   fee_quantity?: number | null;
+  opening_balance?: boolean;
 };
 
 export type LedgerFilter = {

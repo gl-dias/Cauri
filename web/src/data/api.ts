@@ -22,6 +22,7 @@ export type ManualEntry = {
   fi_rate_pct?: string;
   fi_maturity?: string;
   notes?: string;
+  opening_balance?: boolean;
 };
 
 export type MovementPatch = Partial<
@@ -63,6 +64,7 @@ export type ImportDraft = {
   fx_source?: "ptax" | "fechamento" | null;
   fee_asset?: string | null;
   fee_quantity?: string | null;
+  opening_balance?: boolean;
 };
 export type ImportRow = {
   id: string;
@@ -84,7 +86,20 @@ export type ImportBatch = {
   warnings: string[];
   files: ImportFile[];
   counts: Partial<Record<ImportRowStatus, number>>;
+  suggestions?: OpeningSuggestion[];
 };
+/** Saldo que falta para uma venda descoberta, com a sugestão de saldo inicial. */
+export type OpeningSuggestion = {
+  ticker: string;
+  broker_id: string;
+  trade_date: string;
+  quantity: string;
+  first_shortfall: string;
+  unit_cost: string | null;
+  cost_note: string | null;
+  deposit: { quantity: string; day: string } | null;
+};
+export type OpeningBalanceIn = { ticker: string; trade_date: string; quantity: string; unit_cost: string; broker_id: string };
 export type ImportProblem = { index: number; message: string; columns?: string[] };
 export type ImportPreview = { batch: ImportBatch | null; problems: ImportProblem[]; file_indexes: number[] };
 export type ProfileField = "data" | "tipo" | "ativo" | "quantidade" | "preco" | "valor" | "taxa" | "ativo_taxa" | "moeda" | "corretora" | "obs";
@@ -150,6 +165,7 @@ export function createApi(baseUrl: string, token: () => Promise<string | null>) 
       commit: (id: string, decisions: Record<string, ImportDecision>) =>
         call<ImportCommitOut>("POST", `/v1/imports/${id}/commit`, { decisions }),
       discard: (id: string) => call<void>("POST", `/v1/imports/${id}/discard`),
+      addOpening: (id: string, body: OpeningBalanceIn) => call<ImportBatch>("POST", `/v1/imports/${id}/opening-balances`, body),
       profiles: {
         list: () => call<ImportProfile[]>("GET", "/v1/imports/profiles"),
         save: (name: string, mapping: Partial<Record<ProfileField, string>>, options: ProfileOptions) =>

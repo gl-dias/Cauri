@@ -5,7 +5,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { useAppSource, useMovements } from "@/data/context";
 import type { LedgerFilter, MovementRow, MovementType, Origin } from "@/data/types";
 import { formatBRL, formatDate, formatQuantity } from "@/lib/format";
-import { assetInitials, movementValue, originalText, originText, ORIGIN_LABEL, TYPE_LABEL } from "@/lib/movements";
+import { assetInitials, movementValue, originalText, originText, ORIGIN_LABEL, TYPE_LABEL, typeText } from "@/lib/movements";
 import { tokens, type AssetClassKey } from "@/theme/tokens";
 import { GlassButton, PrimaryButton } from "@/ui/controls";
 import { GlassCard } from "@/ui/GlassCard";
@@ -165,7 +165,7 @@ export function LedgerPage() {
                       <td data-num className="py-2.5 pr-3 whitespace-nowrap text-muted">{formatDate(m.trade_date)}</td>
                       <td className="max-w-[240px] py-2.5 pr-3"><AssetCell m={m} /></td>
                       <td className="py-2.5 pr-3 whitespace-nowrap">
-                        {TYPE_LABEL[m.type]}
+                        {typeText(m)}
                         {m.voided_at ? <span className="ml-2 rounded-full bg-loss/15 px-2 py-0.5 text-[11px] text-loss">removida</span> : null}
                       </td>
                       <td data-num className="py-2.5 pr-3 text-right">{m.quantity !== null ? formatQuantity(m.quantity) : ""}</td>
@@ -206,7 +206,7 @@ export function LedgerPage() {
                   </div>
                   <div className="flex items-end justify-between gap-3 text-[13px]">
                     <div className="text-muted">
-                      {TYPE_LABEL[m.type]} · <span data-num>{formatDate(m.trade_date)}</span>
+                      {typeText(m)} · <span data-num>{formatDate(m.trade_date)}</span>
                       {m.quantity !== null ? <> · <span data-num>{formatQuantity(m.quantity)}</span></> : null}
                       {m.voided_at ? <span className="ml-1 text-loss">· removida</span> : null}
                     </div>

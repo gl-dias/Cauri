@@ -15,6 +15,11 @@ export const TYPE_LABEL: Record<MovementType, string> = {
 
 export const ORIGIN_LABEL: Record<Origin, string> = { import: "Planilha", manual: "Manual", chat: "Chat" };
 
+/** "Saldo inicial" para a compra marcada; o rótulo do tipo nos outros casos. */
+export function typeText(m: { type: MovementType; opening_balance?: boolean | null }): string {
+  return m.opening_balance ? "Saldo inicial" : TYPE_LABEL[m.type];
+}
+
 export const INCOME_LABEL: Record<string, string> = {
   dividendo: "Dividendo",
   jcp: "JCP",
