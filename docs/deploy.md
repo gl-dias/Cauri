@@ -4,11 +4,26 @@ Roteiro para subir o Cauri do zero. O que precisa de conta ou de chave é feito 
 nos painéis; o resto é workflow do GitHub. Nenhuma chave passa pelo chat nem entra no repo.
 
 ```
-Cloudflare Pages (/demo, /app)  ──►  Supabase sa-east-1 (Postgres, Auth, PostgREST)
-        │                                  ▲
-        └──►  API na VPS (api.<domínio>) ──┘   GitHub Actions: migrations, deploy da API,
-              Nginx + Certbot, Docker              job diário, monitoramento
+Cloudflare Pages (cauri.pages.dev)  ──►  Supabase sa-east-1 (Postgres, Auth, PostgREST)
+        │                                      ▲
+        └──►  API na VPS (<api.seu-dominio>) ──┘   GitHub Actions: migrations, deploy da API,
+              Nginx + Certbot, Docker                  job diário, monitoramento
 ```
+
+## Valores para preencher
+
+Fora as chaves e senhas (que só vão para os painéis e secrets), são estes:
+
+| Valor | Exemplo | Onde entra |
+|---|---|---|
+| domínio do Pages | `cauri.pages.dev` (definido) | Auth do Supabase (1.5), CORS no `api.env` da VPS |
+| `<ref>` do Supabase | `abcdefghijklmnopqrst` | `VITE_SUPABASE_URL` (Pages), `CAURI_SUPABASE_URL` e conexões |
+| `<host-do-pooler>` | `aws-0-sa-east-1.pooler.supabase.com` | todas as conexões com o banco |
+| `<api.seu-dominio>` | `api.exemplo.com.br` | Nginx e Certbot, `VITE_API_URL` (Pages), variável `API_URL` (GitHub) |
+| `<dominio-do-email>` | `mail.exemplo.com.br` | Resend (2) e remetente do SMTP (1.7) |
+
+Nenhum deles fica no código: o build do Pages monta a CSP com as variáveis `VITE_*`, e o
+Nginx recebe o subdomínio por `sed` na instalação.
 
 ## 1. Supabase (região São Paulo)
 
@@ -26,66 +41,64 @@ Cloudflare Pages (/demo, /app)  ──►  Supabase sa-east-1 (Postgres, Auth, P
    alter role cauri_ingest with password '<senha-forte-2>';
    ```
 
-   As conexões usam o pooler (IPv4), com o usuário no formato `role.<ref>`:
-   - API: `postgresql://cauri_api.<ref>:<senha-1>@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`
-   - jobs: `postgresql://cauri_ingest.<ref>:<senha-2>@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`
+   As conexões usam o pooler (IPv4), com o usuário no formato `role.<ref>`. O host do
+   pooler está no botão *Connect* do painel:
+   - API: `postgresql://cauri_api.<ref>:<senha-1>@<host-do-pooler>:6543/postgres`
+   - jobs: `postgresql://cauri_ingest.<ref>:<senha-2>@<host-do-pooler>:6543/postgres`
    - dono (migrations, preparação, backup): porta **5432** (modo sessão), usuário `postgres.<ref>`.
 5. **Auth, URL Configuration:**
-   - Site URL: `https://<projeto>.pages.dev/app`
-   - Redirect URLs: `https://<projeto>.pages.dev/**` (e o domínio próprio, se houver).
+   - Site URL: `https://cauri.pages.dev/app`
+   - Redirect URLs: `https://cauri.pages.dev/**`
 6. **Auth, Hooks:** ative *Before User Created* apontando para a função Postgres
    `app.hook_before_user_created` (a allowlist). Sem isso, qualquer e-mail cria conta.
 7. **Auth, SMTP próprio** (o padrão do Supabase manda poucos e-mails por hora e não serve
    para produção), com os dados do Resend (seção 2):
    - Host `smtp.resend.com`, porta `465`, usuário `resend`, senha = chave da API do Resend;
-   - Remetente `nao-responda@<domínio>`, nome `Cauri`.
+   - Remetente `nao-responda@<dominio-do-email>`, nome `Cauri`.
    Em *Rate Limits*, suba "emails sent per hour" para 30.
-8. **Chave publicável** (Settings, API Keys): a `sb_publishable_...` vai para o Pages. A
+8. **JWT Keys** (Settings): a chave atual precisa ser assimétrica (ECC ou RSA), o padrão de
+   projeto novo. A API valida o login pelo JWKS público e não precisa de segredo. Se
+   aparecer só *Legacy HS256*, migre para a chave nova no próprio painel.
+9. **Chave publicável** (Settings, API Keys): a `sb_publishable_...` vai para o Pages. A
    chave secreta (service role) não é usada em lugar nenhum.
+
+**O que me passar depois de criar** (nada disso é segredo): o `<ref>` (Settings, General,
+*Project ID*), o `<host-do-pooler>` (botão *Connect*, *Session pooler*) e o tipo da chave
+em *JWT Keys*. Senha do banco, senhas dos roles e chaves ficam só com você.
 
 ## 2. Resend (e-mail do magic link)
 
 O que você cria lá (plano gratuito: 3.000 e-mails por mês, 100 por dia):
 
 1. Conta em resend.com.
-2. **Domínio:** adicione o seu domínio (ou um subdomínio, como `mail.<domínio>`) e crie no
-   DNS os registros que o Resend mostrar (SPF, DKIM e, se quiser, DMARC). Se o DNS estiver
-   no Cloudflare, dá para criar direto pelo botão do Resend. Espere o status *Verified*.
+2. **Domínio:** adicione o `<dominio-do-email>` (um subdomínio como `mail.<seu-dominio>`
+   isola a reputação do domínio principal) e crie no DNS os registros que o Resend mostrar
+   (SPF, DKIM e, se quiser, DMARC). Se o DNS estiver no Cloudflare, dá para criar direto
+   pelo botão do Resend. Espere o status *Verified*.
 3. **Chave da API:** permissão *Sending access*, restrita a esse domínio. Ela é a senha do
    SMTP no Supabase (passo 1.7) e só fica lá.
 
 ## 3. VPS
 
-Tudo em `/opt/cauri`, no padrão dos outros serviços. Detalhes em `deploy/vps/README.md`.
+Passo a passo com os comandos em `deploy/vps/README.md`:
 
-1. Usuário de deploy com chave SSH dedicada e no grupo `docker`. A chave privada vira o
-   secret `VPS_SSH_KEY`; `ssh-keyscan -p <porta> <host>` dá o `VPS_KNOWN_HOSTS`.
-2. `/opt/cauri/docker-compose.yml` (de `deploy/vps/`) e `/opt/cauri/.env` (chmod 600):
-
-   ```dotenv
-   GHCR_OWNER=gl-dias
-   CAURI_API_TAG=latest
-   CAURI_DATABASE_URL=<conexão do cauri_api, porta 6543>
-   CAURI_SUPABASE_URL=https://<ref>.supabase.co
-   CAURI_CORS_ORIGINS=["https://<projeto>.pages.dev"]
-   ANTHROPIC_API_KEY=<chave>
-   GROQ_API_KEY=<chave, opcional: sem ela o navegador transcreve>
-   CAURI_ASSISTANT_DAILY_LIMIT=50
-   ```
-
-   O CORS libera só o domínio do Pages.
-3. Nginx com `deploy/vps/nginx/cauri-api.conf` (troque `api.SEU-DOMINIO`) e
-   `sudo certbot --nginx -d api.<domínio>`.
-4. Backup: `docs/backup.md`.
+1. Na sua máquina: chave SSH nova só para o deploy, `known_hosts` e os dois secrets
+   correspondentes, direto do arquivo para o GitHub com `gh secret set`.
+2. Na VPS: usuário `cauri-deploy` sem senha, no grupo `docker`, com a chave presa a um único
+   comando (`/usr/local/bin/cauri-deploy`); `/opt/cauri` com os segredos em `api.env`.
+3. `api.env` com a conexão do `cauri_api`, a URL do Supabase, o CORS só para
+   `https://cauri.pages.dev` e as chaves da Anthropic e da Groq.
+4. Nginx com o subdomínio e `certbot --nginx`.
+5. Backup: `docs/backup.md`.
 
 ## 4. Cloudflare Pages
 
-1. Conecte o repositório (privado funciona). Projeto `<projeto>`.
+1. Conecte o repositório (privado funciona). Projeto `cauri`, branch de produção `main`.
 2. Build: diretório raiz `web`, comando `npm ci && npm run build`, saída `dist`.
-3. Variáveis de ambiente (não são segredos: vão para o navegador):
+3. Variáveis de ambiente de produção (não são segredos: vão para o navegador):
    - `VITE_SUPABASE_URL=https://<ref>.supabase.co`
    - `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...`
-   - `VITE_API_URL=https://api.<domínio>`
+   - `VITE_API_URL=https://<api.seu-dominio>`
    - `NODE_VERSION=22`
 4. O build gera `_headers` com a CSP liberando conexão só para esse Supabase e essa API, e
    `_redirects` para as rotas da SPA. O teste `e2e/csp.spec.ts` confere no CI que a CSP não
@@ -93,31 +106,40 @@ Tudo em `/opt/cauri`, no padrão dos outros serviços. Detalhes em `deploy/vps/R
 
 ## 5. GitHub: secrets, variável e environment
 
-Crie o environment **production** (Settings, Environments; se quiser, com aprovação manual).
-Os secrets ficam nele ou no repositório:
+Crie o environment **production** (Settings, Environments, ou
+`gh api -X PUT repos/gl-dias/Cauri/environments/production`). Se quiser aprovação manual
+para deploy e migrations, ative nele.
 
-| Secret | Usado em | O que é |
-|---|---|---|
-| `SUPABASE_DB_URL` | `db-migrate.yml`, `bootstrap-prod.yml` | conexão do dono do banco (`postgres.<ref>`, porta 5432) |
-| `CAURI_INGEST_DATABASE_URL` | `daily-market.yml`, `monitor.yml`, `bootstrap-prod.yml` | conexão do role `cauri_ingest` (porta 6543) |
-| `BRAPI_API_KEY` | `daily-market.yml`, `bootstrap-prod.yml` | token da brapi (fechamento diário) |
-| `COINGECKO_API_KEY` | `daily-market.yml`, `bootstrap-prod.yml` | chave Demo do CoinGecko |
-| `ADMIN_EMAIL` | `bootstrap-prod.yml` | seu e-mail, que entra na allowlist como admin |
-| `VPS_HOST` | `deploy-api.yml` | host ou IP da VPS |
-| `VPS_USER` | `deploy-api.yml` | usuário de deploy |
-| `VPS_PORT` | `deploy-api.yml` | porta SSH (opcional; padrão 22) |
-| `VPS_SSH_KEY` | `deploy-api.yml` | chave privada dedicada ao deploy |
-| `VPS_KNOWN_HOSTS` | `deploy-api.yml` | saída do `ssh-keyscan` da VPS |
+Os secrets dos jobs agendados ficam no **repositório**: o job diário e o monitoramento não
+usam o environment (com aprovação manual, eles ficariam esperando alguém todo dia). Os que
+mudam produção ficam no **environment** `production`. O *Preparar produção* enxerga os dois.
 
-Variável (não secreta), em Settings, Variables: `API_URL=https://api.<domínio>`, usada na
-checagem de saúde depois do deploy.
+| Secret | Onde | Usado em | O que é |
+|---|---|---|---|
+| `CAURI_INGEST_DATABASE_URL` | repositório | `daily-market.yml`, `monitor.yml`, `bootstrap-prod.yml` | conexão do role `cauri_ingest` (porta 6543) |
+| `BRAPI_API_KEY` | repositório | `daily-market.yml`, `bootstrap-prod.yml` | token da brapi (fechamento diário) |
+| `COINGECKO_API_KEY` | repositório | `daily-market.yml`, `bootstrap-prod.yml` | chave Demo do CoinGecko |
+| `SUPABASE_DB_URL` | production | `db-migrate.yml`, `bootstrap-prod.yml` | conexão do dono do banco (`postgres.<ref>`, porta 5432) |
+| `ADMIN_EMAIL` | production | `bootstrap-prod.yml` | seu e-mail, que entra na allowlist como admin |
+| `VPS_HOST` | production | `deploy-api.yml` | host ou IP da VPS (o mesmo usado no `ssh-keyscan`) |
+| `VPS_USER` | production | `deploy-api.yml` | `cauri-deploy` |
+| `VPS_PORT` | production | `deploy-api.yml` | porta SSH (opcional; padrão 22) |
+| `VPS_SSH_KEY` | production | `deploy-api.yml` | chave privada dedicada ao deploy |
+| `VPS_KNOWN_HOSTS` | production | `deploy-api.yml` | saída do `ssh-keyscan` da VPS |
 
-As chaves da Anthropic e da Groq não vão para o GitHub: só existem no `.env` da VPS.
+Pelo terminal, sem a chave aparecer na tela: `gh secret set NOME --repo gl-dias/Cauri`
+(repositório) ou com `--env production`; o `gh` pede o valor escondido, ou lê de um arquivo
+com `< arquivo`.
+
+Variável (não secreta), em Settings, Variables: `API_URL=https://<api.seu-dominio>`, usada
+na checagem de saúde depois do deploy.
+
+As chaves da Anthropic e da Groq não vão para o GitHub: só existem no `api.env` da VPS.
 
 ## 6. Ordem e checkpoint
 
 1. Supabase (1.1 a 1.4) e o workflow *Migrations em produção*.
-2. Resend e SMTP do Supabase (1.5 a 1.7, 2).
+2. Resend e SMTP do Supabase (1.5 a 1.9, 2).
 3. Workflow *Preparar produção* (Run workflow, "tudo"): cadastro, ativos, carteira demo,
    admin (`ADMIN_EMAIL`) e histórico de preços.
 4. VPS (3) e o workflow *Deploy da API*.
