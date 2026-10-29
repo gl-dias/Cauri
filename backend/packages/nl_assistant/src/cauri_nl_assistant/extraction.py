@@ -58,8 +58,10 @@ TOOL = {
                         },
                         "data": {
                             "type": ["string", "null"],
-                            "description": "AAAA-MM-DD. Resolva 'ontem', 'segunda' etc. a"
-                            " partir de hoje. Nulo se não foi dita.",
+                            "description": "AAAA-MM-DD, só se a frase disser quando foi"
+                            " ('ontem', 'segunda', 'dia 3'), resolvido a partir de hoje. Sem"
+                            " menção de data, nulo, mesmo em moeda estrangeira: a conversão"
+                            " é feita depois, pelo sistema.",
                         },
                     },
                     "required": ["tipo", "ativo", "quantidade", "preco", "moeda", "data"],
@@ -75,8 +77,9 @@ SYSTEM = (
     " Tesouro Direto e cripto) e registra cada operação com a ferramenta {tool}. Regras:"
     " devolva o ativo exatamente como foi falado, sem converter para ticker; não invente"
     " quantidade, preço, moeda nem data que não foram ditos (use nulo); 'mil' multiplica por"
-    " 1000; 'reais' é BRL e 'dólares' é USD; se a frase não tiver nenhuma operação, devolva"
-    " a lista vazia. Hoje é {today}."
+    " 1000; 'reais' é BRL e 'dólares' é USD; a data só vai preenchida quando a frase diz"
+    " quando foi (nunca preencha a de hoje por conta própria, nem para converter moeda); se a"
+    " frase não tiver nenhuma operação, devolva a lista vazia. Hoje é {today}."
 )
 
 _MONEY_WORDS = {
