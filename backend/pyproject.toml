@@ -1,0 +1,93 @@
+# Workspace uv do backend. Raiz virtual: cada módulo é um pacote em packages/ ou apps/.
+# Os limites entre módulos são checados pelo import-linter (ver [tool.importlinter]).
+
+[tool.uv.workspace]
+members = ["packages/*", "apps/*"]
+
+[dependency-groups]
+dev = [
+  "hypothesis>=6.140",
+  "import-linter>=2.3",
+  "mypy>=1.18",
+  "pytest>=8.4",
+  "ruff>=0.13",
+  "types-pyyaml>=6.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "PT", "DTZ"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # acentos e aspas tipográficas são português, não erro
+
+[tool.ruff.lint.isort]
+known-first-party = ["cauri_*", "conftest", "engine_factories"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["RUF012"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["*.tests.*", "tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "apps"]
+addopts = ["--import-mode=importlib", "-q"]
+# Helpers de teste com nome único por pacote (importlib não põe tests/ no sys.path).
+pythonpath = ["packages/engine/tests"]
+markers = [
+  "db: precisa do Supabase local no ar (supabase start)",
+]
+
+[tool.importlinter]
+include_external_packages = true
+root_packages = [
+  "cauri_core",
+  "cauri_storage",
+  "cauri_engine",
+  "cauri_ledger",
+  "cauri_manual_entry",
+  "cauri_ingest_market",
+  "cauri_api",
+  "cauri_jobs",
+]
+
+[[tool.importlinter.contracts]]
+name = "Camadas: apps > canais de entrada > ledger > engine > storage > core"
+type = "layers"
+layers = [
+  "cauri_api | cauri_jobs",
+  "cauri_manual_entry | cauri_ingest_market",
+  "cauri_ledger",
+  "cauri_engine",
+  "cauri_storage",
+  "cauri_core",
+]
+
+[[tool.importlinter.contracts]]
+name = "ingest_market não conhece o ledger nem o engine"
+type = "forbidden"
+source_modules = ["cauri_ingest_market"]
+forbidden_modules = ["cauri_ledger", "cauri_engine"]
+
+[[tool.importlinter.contracts]]
+name = "Canais de entrada só chegam ao banco pelo ledger"
+type = "forbidden"
+source_modules = ["cauri_manual_entry"]
+forbidden_modules = ["cauri_storage", "psycopg"]
+allow_indirect_imports = true  # via ledger pode; direto, não
+
+[[tool.importlinter.contracts]]
+name = "Núcleo de cálculo do engine é puro (sem I/O)"
+type = "forbidden"
+source_modules = ["cauri_engine.calc"]
+forbidden_modules = ["cauri_storage", "psycopg", "httpx"]

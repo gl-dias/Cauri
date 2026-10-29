@@ -1,0 +1,17 @@
+[project]
+name = "cauri-engine"
+version = "0.1.0"
+description = "Cálculo de posição, preço médio, renda fixa, rentabilidade e snapshots"
+requires-python = ">=3.13"
+dependencies = [
+  "cauri-core",
+  "cauri-storage",
+]
+
+[tool.uv.sources]
+cauri-core = { workspace = true }
+cauri-storage = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"
