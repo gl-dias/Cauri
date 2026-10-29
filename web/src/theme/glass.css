@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* Os valores vêm de src/theme/tokens.ts (applyTheme). Aqui só se dá nome às variáveis para
+   o Tailwind e se define o vidro. Nenhum valor de cor mora neste arquivo. */
+@theme inline {
+  --font-sans: var(--cauri-font-sans);
+  --color-ink: var(--cauri-text);
+  --color-muted: var(--cauri-text-muted);
+  --color-subtle: var(--cauri-text-subtle);
+  --color-gain: var(--cauri-gain);
+  --color-loss: var(--cauri-loss);
+  --color-accent: var(--cauri-accent);
+  --color-primary: var(--cauri-primary);
+  --color-primary-hover: var(--cauri-primary-hover);
+  --color-gold: var(--cauri-gold);
+  --color-on-light: var(--cauri-on-light);
+  --color-glass: var(--cauri-glass-fill);
+  --color-glass-strong: var(--cauri-glass-fill-strong);
+  --color-glass-border: var(--cauri-glass-border);
+  --color-class-acao: var(--cauri-class-acao);
+  --color-class-fii: var(--cauri-class-fii);
+  --color-class-renda_fixa: var(--cauri-class-renda_fixa);
+  --color-class-cripto: var(--cauri-class-cripto);
+  --color-class-tesouro: var(--cauri-class-tesouro);
+  --radius-card: var(--cauri-radius-card);
+  --radius-inner: var(--cauri-radius-inner);
+  --shadow-card: var(--cauri-shadow-card);
+  --shadow-lifted: var(--cauri-shadow-lifted);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: #1b130f; /* cor de base enquanto a foto e o placeholder carregam */
+  }
+  body {
+    @apply min-h-dvh font-sans text-ink antialiased;
+    background: transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Números sempre em algarismos de largura fixa: colunas e contagens não "pulam". */
+  .tabular,
+  [data-num] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv11" 1;
+  }
+  :focus-visible {
+    outline: 2px solid var(--cauri-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Vidro fosco: fundo translúcido, blur com saturação, borda fina e um brilho no topo. */
+  .glass-card,
+  .glass-pill {
+    --glass-blur: var(--cauri-glass-blur);
+  }
+
+  .glass-card {
+    position: relative;
+    background: var(--cauri-glass-fill);
+    border: 1px solid var(--cauri-glass-border);
+    border-radius: var(--cauri-radius-card);
+    box-shadow:
+      var(--cauri-shadow-card),
+      inset 0 1px 0 var(--cauri-glass-highlight);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--cauri-glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--cauri-glass-saturate));
+  }
+
+  /* Vidro tingido pela cor da classe de ativo: defina --tint no elemento. */
+  .glass-tinted {
+    background:
+      linear-gradient(
+        160deg,
+        color-mix(in srgb, var(--tint) calc(var(--cauri-glass-tint-opacity) * 100%), transparent),
+        transparent 70%
+      ),
+      var(--cauri-glass-fill);
+  }
+
+  /* Pílula e botão circular de vidro (barra superior, dock, filtros). */
+  .glass-pill {
+    background: var(--cauri-glass-fill);
+    border: 1px solid var(--cauri-glass-border);
+    border-radius: var(--cauri-radius-pill);
+    box-shadow: inset 0 1px 0 var(--cauri-glass-highlight);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--cauri-glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--cauri-glass-saturate));
+  }
+
+  /* Dentro de um card de vidro não se empilha outro blur (desempenho no celular). */
+  .glass-inset {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--cauri-radius-inner);
+  }
+
+  .label {
+    @apply text-[12px] font-medium tracking-wide text-subtle uppercase;
+  }
+}
+
+/* Sem backdrop-filter (navegadores antigos): vidro vira painel sólido e legível. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-card,
+  .glass-pill {
+    background: var(--cauri-glass-fallback);
+  }
+}
+
+/* Celular: menos blur custa menos GPU na rolagem, e o vidro continua parecendo vidro. */
+@media (max-width: 640px) {
+  .glass-card,
+  .glass-pill {
+    --glass-blur: var(--cauri-glass-blur-mobile);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Barra de rolagem horizontal discreta no carrossel de KPIs do celular. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
