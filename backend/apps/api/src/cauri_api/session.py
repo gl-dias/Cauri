@@ -7,6 +7,7 @@ rodam, acontece antes da resposta, e um erro ali ainda vira resposta de erro.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated
@@ -14,7 +15,10 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, Request, status
 
 from cauri_api.auth import AuthError, AuthUser, TokenVerifier
+from cauri_engine.persist import last_closed_day, recalc_dirty
 from cauri_storage import Conn, Pool, user_transaction
+
+log = logging.getLogger("cauri.api")
 
 
 def _verifier(request: Request) -> TokenVerifier:
@@ -52,6 +56,21 @@ class Session:
             if not row or not row["ok"]:
                 raise HTTPException(status.HTTP_403_FORBIDDEN, "Acesso restrito a convidados.")
             yield conn
+
+    def refresh_snapshots(self) -> bool:
+        """Recalcula os snapshots do usuário depois de uma escrita no ledger.
+
+        Roda numa transação separada, depois do commit da escrita: se o recálculo
+        falhar, a movimentação continua gravada, a marca em engine.dirty_ranges fica e
+        o job da noite completa. Nunca derruba a resposta.
+        """
+        try:
+            with user_transaction(self._pool, self.user.claims) as conn:
+                recalc_dirty(conn, self.user.id, until=last_closed_day())
+        except Exception:
+            log.exception("recálculo dos snapshots falhou; o job diário completa")
+            return False
+        return True
 
     @contextmanager
     def admin(self) -> Iterator[Conn]:

@@ -38,16 +38,23 @@ def post_manual(body: ManualEntriesIn, session: SessionDep) -> PostOut:
     forms = [e.to_form() for e in body.entries]
     with session.member() as conn:
         result = manual.submit(Ledger(conn), session.user.id, forms)
-    return PostOut(created=list(result.created), already_posted=list(result.already_posted))
+    refreshed = session.refresh_snapshots() if result.created else True
+    return PostOut(
+        created=list(result.created),
+        already_posted=list(result.already_posted),
+        snapshots_updated=refreshed,
+    )
 
 
 @router.patch("/{movement_id}", status_code=status.HTTP_204_NO_CONTENT)
 def edit_movement(movement_id: UUID, body: MovementPatchIn, session: SessionDep) -> None:
     with session.member() as conn:
         manual.edit(Ledger(conn), session.user.id, movement_id, body.to_form(), body.reason)
+    session.refresh_snapshots()
 
 
 @router.post("/{movement_id}/void", status_code=status.HTTP_204_NO_CONTENT)
 def void_movement(movement_id: UUID, body: VoidIn, session: SessionDep) -> None:
     with session.member() as conn:
         manual.remove(Ledger(conn), session.user.id, movement_id, body.reason)
+    session.refresh_snapshots()

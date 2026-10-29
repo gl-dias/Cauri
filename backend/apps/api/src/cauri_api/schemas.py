@@ -124,6 +124,8 @@ class ChecksOut(BaseModel):
 class PostOut(BaseModel):
     created: list[UUID]
     already_posted: list[UUID]
+    # False se o recálculo falhou: a movimentação está gravada e o job da noite completa.
+    snapshots_updated: bool = True
 
 
 class MeOut(BaseModel):

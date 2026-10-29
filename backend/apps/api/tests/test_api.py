@@ -97,7 +97,27 @@ class TestLancamentoManual:
         assert len(first.json()["created"]) == 1
 
         again = client.post("/v1/movements", json=payload, headers=auth(user))
-        assert again.json() == {"created": [], "already_posted": first.json()["created"]}
+        assert again.json()["created"] == []
+        assert again.json()["already_posted"] == first.json()["created"]
+
+    def test_gravar_ja_recalcula_os_snapshots(self, client, make_user, api_pool):
+        user = make_user()
+        response = client.post("/v1/movements", json={"entries": [entry()]}, headers=auth(user))
+        assert response.json()["snapshots_updated"] is True
+        from cauri_storage import user_transaction
+
+        with user_transaction(api_pool, user.claims) as conn:
+            snap = conn.execute(
+                "select min(snap_date) as first, count(*) as n from engine.portfolio_snapshots"
+                " where user_id = %s",
+                [user.id],
+            ).fetchone()
+            dirty = conn.execute(
+                "select count(*) as n from engine.dirty_ranges where user_id = %s", [user.id]
+            ).fetchone()
+        assert snap["first"].isoformat() == "2026-03-02"
+        assert snap["n"] > 100  # um snapshot por pregão até o último fechamento
+        assert dirty["n"] == 0
 
     def test_venda_descoberta_volta_422_com_o_motivo(self, client, make_user):
         user = make_user()
