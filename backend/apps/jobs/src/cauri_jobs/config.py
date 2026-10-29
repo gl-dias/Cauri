@@ -55,6 +55,14 @@ class JobsConfig:
         return _find_reference_dir()
 
     @property
+    def brapi_token(self) -> str | None:
+        return os.environ.get("BRAPI_API_KEY") or None
+
+    @property
+    def brapi_monthly_quota(self) -> int:
+        return int(os.environ.get("CAURI_BRAPI_MONTHLY_QUOTA", "15000"))
+
+    @property
     def coingecko_key(self) -> str | None:
         return os.environ.get("COINGECKO_API_KEY") or None
 

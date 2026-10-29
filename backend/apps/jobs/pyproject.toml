@@ -10,6 +10,7 @@ dependencies = [
   "cauri-ledger",
   "cauri-ingest-market",
   "pyyaml>=6.0",
+  "python-dotenv>=1.1",
 ]
 
 [project.scripts]

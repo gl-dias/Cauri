@@ -205,6 +205,7 @@ dependencies = [
     { name = "cauri-ingest-market" },
     { name = "cauri-ledger" },
     { name = "cauri-storage" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
 
@@ -215,6 +216,7 @@ requires-dist = [
     { name = "cauri-ingest-market", editable = "packages/ingest_market" },
     { name = "cauri-ledger", editable = "packages/ledger" },
     { name = "cauri-storage", editable = "packages/storage" },
+    { name = "python-dotenv", specifier = ">=1.1" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
 
