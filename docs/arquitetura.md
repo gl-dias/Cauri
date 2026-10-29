@@ -403,8 +403,9 @@ Fase 3, screenshots de cada tela em desktop e celular.
    gravação dos snapshots (inclusive os do demo, por classe e por corretora), recálculo
    pela API depois de cada escrita no ledger e processamento de `engine.dirty_ranges`
    pelo job.
-3. **Frontend:** em duas etapas. 3a (entregue): tema de vidro, componentes e Início no
-   `/demo`. 3b: Carteira, Lançamentos (com o lançamento manual), Admin e `/app` com login.
+3. **Frontend (entregue):** 3a, tema de vidro, componentes e Início no `/demo`; 3b,
+   Carteira, Lançamentos (com o lançamento manual, edição e remoção), Admin e `/app` com
+   login por magic link.
 4. **Importação:** importers (adaptador genérico + os das corretoras a partir dos
    exemplos), tela Importar, reconciliação entre origens, vitrine estática no `/demo`.
 5. **Assistente:** `nl_assistant`, tela Assistente com texto e voz, vitrine estática no
@@ -465,6 +466,26 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
   Supabase do demo não guarda sessão nem manda JWT.
 - **Fonte:** Inter (algarismos tabulares de verdade). Bundle dividido por biblioteca, telas
   carregadas sob demanda.
+
+### /app (Fase 3b)
+
+- **Login:** magic link com PKCE (`/login`). Quem não está na allowlist é recusado pelo hook
+  do Supabase Auth; a tela mostra sempre a mesma mensagem ("se o seu e-mail estiver na lista
+  de convidados..."), sem revelar nada. Sessão válida fora da allowlist cai numa tela de
+  "acesso restrito".
+- **Um só cliente de sessão** para `/login` e `/app`; o `/demo` fica fora dele e nunca lê
+  nem cria sessão.
+- **Escrita só pela API**, com o fluxo de confirmação: "Conferir" chama `/v1/movements/check`
+  (erros e duplicados prováveis), "Confirmar" grava. A chave de idempotência nasce com o
+  formulário, então clique duplo não duplica. Edição pede motivo opcional e remoção pede
+  motivo obrigatório; os dois vão para o histórico de auditoria.
+- **Admin** (só para admin, e a API e o RLS recusam os outros): allowlist (convidar, trocar
+  papel, remover) e o log dos jobs por fonte (`marts.job_runs`, `marts.job_sources`).
+- **Período padrão do Início no /app:** "Ano".
+- **Testes de interface:** a bateria simulada (9 telas, desktop e celular, contraste AA e
+  sem rolagem horizontal) roda no CI. A bateria ao vivo (`CAURI_E2E_LIVE=1`) faz o fluxo
+  real com Supabase, API e Mailpit locais: login pelo magic link, lançamento gravado pela
+  API, admin e a allowlist barrando quem não foi convidado.
 
 ## 7. Decisões confirmadas
 

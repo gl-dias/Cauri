@@ -35,6 +35,14 @@ lint:
     cd backend && uv run mypy {{packages}}
     cd backend && uv run lint-imports
 
+# Testes de interface com backend simulado (contraste AA, layout e screenshots)
+e2e *args:
+    cd web && npx playwright test {{args}}
+
+# Ponta a ponta de verdade: precisa de `just db-start`, `just api` e `npm run dev` no ar
+e2e-live:
+    cd web && CAURI_E2E_LIVE=1 npx playwright test e2e/app-live.spec.ts --project=desktop
+
 # Workflows do GitHub Actions e segredos, antes de qualquer push (via Docker)
 pre-push:
     docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -no-color
