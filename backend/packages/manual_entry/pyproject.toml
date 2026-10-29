@@ -1,0 +1,17 @@
+[project]
+name = "cauri-manual-entry"
+version = "0.1.0"
+description = "Lançamento manual: formulário para rascunho de ledger"
+requires-python = ">=3.13"
+dependencies = [
+  "cauri-core",
+  "cauri-ledger",
+]
+
+[tool.uv.sources]
+cauri-core = { workspace = true }
+cauri-ledger = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"

@@ -1,0 +1,17 @@
+[project]
+name = "cauri-storage"
+version = "0.1.0"
+description = "Acesso ao Postgres: pool, sessão com RLS e repositórios"
+requires-python = ">=3.13"
+dependencies = [
+  "cauri-core",
+  "psycopg[binary]>=3.2",
+  "psycopg-pool>=3.2",
+]
+
+[tool.uv.sources]
+cauri-core = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"
