@@ -9,6 +9,10 @@
 id_rsa*
 id_ed25519*
 
+# Referência visual de terceiros (vídeo, prints, frames extraídos e comparações):
+# só para consulta local, nunca vai para o repositório.
+reference-private/
+
 # Dumps e backups de banco: podem conter dados reais
 *.dump
 *.backup
