@@ -1,0 +1,9 @@
+# Configuração do gitleaks: as regras padrão, mais exceções explícitas e documentadas.
+# Cada exceção é um valor exato, nunca um padrão genérico.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Chave publishable padrão do Supabase local: pública por design, igual em toda instalação da CLI e só funciona em 127.0.0.1"
+regexes = ['''sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH''']
