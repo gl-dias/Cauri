@@ -58,7 +58,8 @@ jobs:
       - name: Testes de banco (pgTAP)
         run: supabase test db
 
-      - uses: astral-sh/setup-uv@v10
+      # A setup-uv não publica tag de versão maior desde a v8: fica fixada na exata.
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           version: "0.13.6"
           enable-cache: true
