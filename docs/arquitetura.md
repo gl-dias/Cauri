@@ -362,10 +362,16 @@ migrations rodam no CI contra o Supabase local antes do push.
 - **O brapi gratuito não cobre Tesouro** (só no Pro), tem **histórico de só 3 meses** e
   **não traz dividendos**. As 15 mil requisições/mês, com 1 ativo por chamada, dão
   folga para uns 600 tickers por dia útil.
-- **O fechamento às 18h30 fica no limite.** O brapi gratuito tem uns 30 min de atraso,
-  e no horário de verão americano o pregão fecha às 18h. O job confere o horário da
-  cotação. Se ainda não for o fechamento, marca o ativo, e uma segunda passada às
-  19h30 completa só o que faltou.
+- **O fechamento às 18h30 fica no limite de novembro a março.** A B3 acompanha o
+  horário de verão americano (Ofício Circular 005/2026-PRE): com ele (2º domingo de
+  março ao 1º domingo de novembro), a negociação contínua vai até 16h55 e o call de
+  fechamento até 17h; sem ele, até 17h55 e 18h. A brapi gratuita tem uns 30 min de
+  atraso, então de novembro a março o fechamento pode não ter chegado às 18h30. O job
+  só aceita como fechamento a cotação do dia posterior ao início do call; antes disso o
+  ativo fica pendente, e a segunda passada às 19h30 completa só o que faltou. Em 2026 o
+  horário de verão americano termina em 01/11; o primeiro pregão com fechamento às 18h
+  é 03/11 (02/11 é Finados). *Na proposta original isso estava invertido; corrigido na
+  Fase 2.*
 
 ### Fontes por uso
 
@@ -392,10 +398,11 @@ Fase 3, screenshots de cada tela em desktop e celular.
    (COTAHIST, Tesouro Transparente, CoinGecko e SGS) e a sincronização de ativos
    foram antecipados para esta fase. O engine já calcula os snapshots em memória; a
    gravação deles é da Fase 2.
-2. **Mercado:** job diário no GitHub Actions (brapi para o fechamento de ações e FIIs,
-   CoinGecko, Tesouro Transparente, SGS) com log por fonte e controle de cota,
-   gravação dos snapshots (inclusive os do demo), recálculo pela API depois de cada
-   escrita no ledger e processamento de `engine.dirty_ranges` pelo job.
+2. **Mercado (entregue):** job diário no GitHub Actions (brapi para o fechamento de ações
+   e FIIs, CoinGecko, Tesouro Transparente, SGS) com log por fonte e controle de cota,
+   gravação dos snapshots (inclusive os do demo, por classe e por corretora), recálculo
+   pela API depois de cada escrita no ledger e processamento de `engine.dirty_ranges`
+   pelo job.
 3. **Frontend:** tema de vidro, telas Início, Carteira, Lançamentos (com o lançamento
    manual) e Admin, `/app` e `/demo`. Três opções de foto de fundo livres de direitos
    para escolha.
@@ -405,6 +412,31 @@ Fase 3, screenshots de cada tela em desktop e celular.
    `/demo`.
 6. **Deploy final:** Cloudflare Pages, Supabase em produção, API na VPS via GitHub
    Actions, README de portfólio.
+
+### Job diário
+
+Dois agendamentos em UTC no `.github/workflows/daily-market.yml`, seg a sex: `30 21`
+(18h30 em Brasília) e `30 22` (19h30). Brasília é UTC-3 o ano todo, então os horários
+não mudam; o que muda é o fechamento da B3 (ver acima).
+
+1. Monta a lista de ativos pela união das carteiras (inclusive a demo), sem repetir.
+2. Busca o fechamento do dia em cada fonte, cada uma na sua transação, com o resultado
+   em `ops.source_status` (`ok`, `partial`, `failed`, `quota_exceeded`, `skipped`).
+   - brapi: um ativo por chamada, token só no header, cota mensal conferida antes de
+     cada chamada (`ops.quota_usage`); limite atingido ou plano sem acesso param a fonte
+     sem nova tentativa; rede e 5xx têm uma nova tentativa no máximo.
+   - CoinGecko: todos os criptoativos numa chamada, BRL e USD. Cripto não tem
+     fechamento: vale o preço no momento da coleta.
+   - Tesouro: PU de D-1 (sai na manhã seguinte), marcado com a própria data.
+   - SGS: últimos dias de CDI, Selic meta, Selic efetiva e IPCA.
+3. Grava resposta crua (`raw.market_payloads`, sem token) e versão limpa
+   (`market.prices_daily`, `market.indicators`).
+4. Recalcula os snapshots de cada carteira a partir da menor data entre a marca do ledger
+   e 7 dias atrás (para absorver dado que chega atrasado, como o PU de D-1).
+5. Segunda passada: só chama a fonte para o que ainda não tem preço do dia.
+
+Sem `CAURI_INGEST_DATABASE_URL` nos secrets (até a Fase 6), o agendamento roda e sai
+sem erro. Um passo de keepalive reativa o workflow pela API em toda execução.
 
 **Demo com ledger fictício e preço real:** tickers de verdade (PETR4, BTC) com uma
 carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
@@ -440,8 +472,17 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
 - **CoinGecko com no máximo duas novas tentativas** em caso de limite por minuto (429),
   respeitando o `Retry-After`. Nunca insiste indefinidamente.
 - **Rentabilidade por classe e por corretora** já sai do engine (uma cota por classe e
-  por corretora). Onde gravar fica para a Fase 2 (provavelmente uma tabela
-  `engine.bucket_snapshots`).
+  por corretora). Na Fase 2 ganhou a tabela `engine.bucket_snapshots`.
+
+### Ajustes feitos durante a Fase 2
+
+- **Horário da B3 corrigido** (ver "O que foi conferido ao vivo" acima).
+- **Snapshots vão até o último pregão com fechamento disponível** (fim do call + 30 min).
+  Durante o pregão, o dia de hoje ainda não tem snapshot; movimentação lançada hoje
+  aparece na lista na hora e no gráfico depois do fechamento.
+- **Recálculo pela API em transação separada**, depois do commit da escrita: se falhar, a
+  movimentação continua gravada, a marca em `engine.dirty_ranges` fica e o job da noite
+  completa. A resposta do `POST /v1/movements` diz se os snapshots foram atualizados.
 
 ### Rascunho do template genérico de planilha
 
