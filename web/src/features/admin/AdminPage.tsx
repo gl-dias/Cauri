@@ -222,6 +222,59 @@ function JobsPanel() {
   );
 }
 
+function UsagePanel() {
+  const app = useAppSource();
+  const daily = useQuery({ queryKey: ["app", "llm_usage_daily"], queryFn: () => app!.llmUsageDaily(), enabled: Boolean(app) });
+  const users = useQuery({ queryKey: ["app", "llm_usage_users"], queryFn: () => app!.llmUsageUsers(), enabled: Boolean(app) });
+  const rows = daily.data ?? [];
+  const messages = rows.filter((r) => r.kind === "mensagem");
+  const audio = rows.filter((r) => r.kind === "transcricao");
+  const sum = (list: typeof rows, key: "calls" | "failures" | "input_tokens" | "output_tokens" | "audio_bytes") =>
+    list.reduce((total, r) => total + Number(r[key]), 0);
+  const fmt = (n: number) => new Intl.NumberFormat("pt-BR").format(n);
+  return (
+    <GlassCard lift={false}>
+      <CardHeader title="Uso do assistente" subtitle="Chamadas pagas nos últimos 30 dias (Haiku e transcrição). Limite: 50 por pessoa por dia." />
+      {daily.isLoading ? (
+        <Skeleton className="h-24" />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Mensagens", value: fmt(sum(messages, "calls")) },
+              { label: "Tokens de entrada", value: fmt(sum(messages, "input_tokens")) },
+              { label: "Tokens de saída", value: fmt(sum(messages, "output_tokens")) },
+              { label: "Áudios", value: fmt(sum(audio, "calls")) },
+            ].map((k) => (
+              <div key={k.label} className="glass-inset p-3">
+                <div className="text-[12px] text-muted">{k.label}</div>
+                <div data-num className="mt-1 text-[18px] font-semibold">{k.value}</div>
+              </div>
+            ))}
+          </div>
+          {sum(rows, "failures") ? (
+            <p className="text-[13px] text-gold">{fmt(sum(rows, "failures"))} chamada(s) falharam no período.</p>
+          ) : null}
+          {users.data?.length ? (
+            <ul className="divide-y divide-white/[0.06] text-[13px]">
+              {users.data.map((u) => (
+                <li key={u.user_id} className="flex items-center justify-between gap-3 py-2">
+                  <span className="truncate font-medium">{u.display_name}</span>
+                  <span data-num className="shrink-0 text-muted">
+                    {fmt(u.messages)} msg · {fmt(u.transcriptions)} áudio · {fmt(Number(u.tokens))} tokens
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[14px] text-muted">Nenhuma chamada no período.</p>
+          )}
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 export function AdminPage() {
   const reduced = useReducedMotion();
   return (
@@ -234,8 +287,9 @@ export function AdminPage() {
         <div className="min-w-0 xl:col-span-7">
           <AllowlistPanel />
         </div>
-        <div className="min-w-0 xl:col-span-5">
+        <div className="min-w-0 space-y-5 sm:space-y-6 xl:col-span-5">
           <JobsPanel />
+          <UsagePanel />
         </div>
       </div>
     </motion.div>

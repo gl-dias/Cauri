@@ -5,6 +5,8 @@
  */
 import { useCallback, useRef, useState } from "react";
 
+const MAX_SECONDS = 30;
+
 type Recognition = {
   lang: string;
   interimResults: boolean;
@@ -55,6 +57,13 @@ export function useVoice(mode: "groq" | "navegador" | undefined, transcribe: (au
         recorder.current = rec;
         rec.start();
         setListening(true);
+        // Uma operação por vez: a gravação para sozinha aos 30 segundos (limite de custo).
+        window.setTimeout(() => {
+          if (rec.state === "recording") {
+            rec.stop();
+            setListening(false);
+          }
+        }, MAX_SECONDS * 1000);
       } catch {
         setError("Sem acesso ao microfone.");
       }

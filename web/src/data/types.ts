@@ -163,3 +163,24 @@ export type Goal = {
   target_amount: number;
   target_date: string | null;
 };
+
+/** Uso do assistente (chamadas pagas), últimos 30 dias. Só o admin vê de todos. */
+export type LlmUsageDay = {
+  day: string;
+  provider: "anthropic" | "groq" | "regras";
+  kind: "mensagem" | "transcricao";
+  calls: number;
+  failures: number;
+  users: number;
+  input_tokens: number;
+  output_tokens: number;
+  audio_bytes: number;
+};
+export type LlmUsageUser = {
+  user_id: string;
+  display_name: string;
+  messages: number;
+  transcriptions: number;
+  tokens: number;
+  last_at: string;
+};

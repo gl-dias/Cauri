@@ -25,6 +25,7 @@ const STATUS: Record<ProposalItem["status"], { label: string; style: string }> =
   pergunta: { label: "pergunta", style: "text-gold [background:color-mix(in_srgb,var(--cauri-gold)_14%,rgba(0,0,0,0.74))]" },
   gravado: { label: "gravada", style: "bg-black/45 text-muted" },
 };
+const MAX_TEXT = 500; // o mesmo limite da API
 const EXAMPLES = ["comprei 3 petrobras e vendi 2 itau", "comprei 0,01 bitcoin a 120 mil dólares", "recebi 48 reais de taesa ontem"];
 
 export function AssistantPage() {
@@ -293,6 +294,7 @@ function Composer({ onSend, disabled, busy, hint, voiceMode, transcribe, error, 
         <TextArea
           aria-label="Mensagem para o assistente"
           rows={2}
+          maxLength={MAX_TEXT}
           value={text}
           disabled={disabled && !busy}
           placeholder={hint ?? "Ex.: comprei 10 PETR4 a 38,50 ontem"}
@@ -322,6 +324,9 @@ function Composer({ onSend, disabled, busy, hint, voiceMode, transcribe, error, 
           <Send className="size-4" />
         </PrimaryButton>
       </div>
+      {text.length > MAX_TEXT - 80 ? (
+        <p data-num className="text-[12px] text-muted">{text.length} de {MAX_TEXT} caracteres</p>
+      ) : null}
       {busy ? <p className="text-[13px] text-muted">Entendendo a frase...</p> : null}
       {voice.busy ? <p className="text-[13px] text-muted">Transcrevendo o áudio...</p> : null}
       {voice.error ? <p className="text-[13px] text-loss">{voice.error}</p> : null}

@@ -174,6 +174,14 @@ export async function mockApp(page: Page, { role = "admin" as "admin" | "user" }
     me: [{ user_id: APP_USER.id, display_name: "Convidada Teste", role }],
     job_runs: JOB_RUNS,
     job_sources: JOB_SOURCES,
+    llm_usage_daily: [
+      { day: "2026-10-28", provider: "anthropic", kind: "mensagem", calls: 23, failures: 1, users: 2, input_tokens: 18760, output_tokens: 2150, audio_bytes: 0 },
+      { day: "2026-10-28", provider: "groq", kind: "transcricao", calls: 6, failures: 0, users: 1, input_tokens: 0, output_tokens: 0, audio_bytes: 412000 },
+    ],
+    llm_usage_users: [
+      { user_id: APP_USER.id, display_name: "Convidada Teste", messages: 15, transcriptions: 6, tokens: 13400, last_at: "2026-10-28T21:40:00Z" },
+      { user_id: "00000000-0000-4000-8000-0000000000bb", display_name: "Amigo Um", messages: 8, transcriptions: 0, tokens: 7510, last_at: "2026-10-27T12:00:00Z" },
+    ],
   };
   await page.route(/\/rest\/v1\/([a-z_]+)/, async (route) => {
     const view = new URL(route.request().url()).pathname.split("/").pop() ?? "";

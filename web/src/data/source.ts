@@ -15,6 +15,8 @@ import type {
   Goal,
   JobRun,
   JobSource,
+  LlmUsageDay,
+  LlmUsageUser,
   LedgerFilter,
   Me,
   MovementRow,
@@ -49,6 +51,8 @@ export type AppSource = PortfolioReader & {
   fiInstruments(): Promise<FiInstrument[]>;
   jobRuns(limit: number): Promise<JobRun[]>;
   jobSources(runIds: string[]): Promise<JobSource[]>;
+  llmUsageDaily(): Promise<LlmUsageDay[]>;
+  llmUsageUsers(): Promise<LlmUsageUser[]>;
 };
 
 export type AnySource = DemoSource | AppSource;
@@ -177,5 +181,7 @@ export function createAppSource(client: MartsClient, api: ApiClient): AppSource 
       rows<JobRun>(client.from("job_runs").select("*").order("started_at", { ascending: false }).limit(limit)),
     jobSources: (runIds) =>
       runIds.length ? rows<JobSource>(client.from("job_sources").select("*").in("run_id", runIds)) : Promise.resolve([]),
+    llmUsageDaily: () => rows<LlmUsageDay>(client.from("llm_usage_daily").select("*").order("day", { ascending: false })),
+    llmUsageUsers: () => rows<LlmUsageUser>(client.from("llm_usage_users").select("*").order("tokens", { ascending: false })),
   };
 }
