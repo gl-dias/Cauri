@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(40);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -63,6 +63,8 @@ values
   ('00000000-0000-4000-8000-00000000000a', date '2026-10-01', 330, 310, 0, 1.06, 1.1, 1.04),
   ('00000000-0000-4000-8000-0000000000dd', date '2026-10-01', 1100, 1000, 0, 1.1, 1.1, 1.04);
 
+insert into ops.job_runs (job, trigger, status) values ('daily', 'cron', 'ok');
+
 -- ana (membro, admin) ---------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -77,6 +79,7 @@ select is((select count(*)::int from engine.bucket_snapshots), 1, 'ana vê só o
 select is((select count(*)::int from app.allowlist where email like '%@example.test' and email in ('ana@example.test', 'bruno@example.test')), 2,
   'admin lê a allowlist');
 select is((select role from marts.me), 'admin', 'marts.me da ana diz admin');
+select ok((select count(*) from marts.job_runs) >= 1, 'admin lê o log de jobs pela view');
 select is((select count(*)::int from market.assets where ticker in ('AAAA3', 'BBBB4', 'DDDD3')), 3,
   'membro lê todos os ativos');
 
@@ -106,6 +109,7 @@ select throws_ok(
   $$insert into app.allowlist (email) values ('intruso@example.test')$$,
   '42501', null, 'usuário comum não adiciona e-mail na allowlist');
 select is((select count(*)::int from ops.job_runs), 0, 'usuário comum não lê o log de jobs');
+select is((select count(*)::int from marts.job_runs), 0, 'usuário comum não lê o log de jobs pela view');
 
 reset role;
 
@@ -156,6 +160,7 @@ select is((select count(*)::int from marts.buckets_daily where user_id <> app.de
 select is((select count(*)::int from marts.positions_current where user_id <> app.demo_user_id()), 0,
   'marts.positions_current do anon não tem carteira real');
 select throws_ok($$select count(*) from app.allowlist$$, '42501', null, 'anon não lê a allowlist');
+select throws_ok($$select count(*) from marts.job_runs$$, '42501', null, 'anon não lê o log de jobs');
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
     values ('00000000-0000-4000-8000-0000000000dd', date '2026-03-02', '10000000-0000-4000-8000-000000000004',
