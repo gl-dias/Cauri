@@ -38,6 +38,7 @@ from cauri_ledger.models import (
     MovementNotFoundError,
     MovementPatch,
     PostResult,
+    Shortfall,
 )
 from cauri_ledger.staging import ImportStore
 from cauri_ledger.validation import check_class, check_shape
@@ -134,7 +135,8 @@ class Ledger:
                     duplicates[i] = tuple(found)
 
         simulate = [i for i in candidates if not (duplicates_neutral and i in duplicates)]
-        self._simulate_timeline(user_id, drafts, resolved, simulate, errors, excluded)
+        shortfalls: dict[int, Shortfall] = {}
+        self._simulate_timeline(user_id, drafts, resolved, simulate, errors, excluded, shortfalls)
 
         checks: list[DraftCheck] = []
         for i, d in enumerate(drafts):
@@ -145,6 +147,7 @@ class Ledger:
                     errors=tuple(errors[i]),
                     duplicates=() if errors[i] else duplicates.get(i, ()),
                     already_posted=posted.get(d.idempotency_key),
+                    shortfall=shortfalls.get(i),
                 )
             )
         return checks
@@ -248,6 +251,7 @@ class Ledger:
             factor=d.factor,
             income_kind=d.income_kind,
             seq=seq,
+            opening_balance=d.opening_balance,
         )
 
     def _simulate_timeline(
@@ -258,6 +262,7 @@ class Ledger:
         indexes: list[int],
         errors: list[list[Issue]],
         excluded: Collection[UUID] = (),
+        shortfalls: dict[int, Shortfall] | None = None,
     ) -> None:
         """Simula a linha do tempo com os rascunhos e marca os que a quebrariam.
 
@@ -306,6 +311,13 @@ class Ledger:
                         "quantity",
                     )
                 )
+                if shortfalls is not None and resolved[culprit].ticker:
+                    shortfalls[culprit] = Shortfall(
+                        ticker=resolved[culprit].ticker or "",
+                        trade_date=found.trade_date,
+                        available=found.available,
+                        missing=found.shortfall,
+                    )
             else:
                 culprit = self._latest_reducing_draft(
                     active, simulated, found.asset_id, found.trade_date
@@ -451,6 +463,7 @@ class Ledger:
                     "fx_source": d.fx_source,
                     "fee_asset": d.fee_asset,
                     "fee_quantity": d.fee_quantity,
+                    "opening_balance": d.opening_balance,
                 },
             )
             if new_id is None:

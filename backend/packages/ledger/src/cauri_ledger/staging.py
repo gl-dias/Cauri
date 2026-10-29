@@ -43,6 +43,7 @@ class StagedRow:
     messages: tuple[Mapping[str, Any], ...] = ()
     match_movement_ids: tuple[UUID, ...] = ()
     decision: Decision | None = None
+    transfer: Mapping[str, Any] | None = None  # depósito ou saque: moeda, quantidade, dia
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +72,7 @@ class StoredBatch:
     finished_at: datetime | None
     warnings: tuple[str, ...]
     files: tuple[StoredFile, ...]
+    suggestions: tuple[Mapping[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,8 +196,8 @@ class ImportStore:
             cur.executemany(
                 "insert into imports.rows"
                 " (file_id, user_id, position, line_numbers, raw, draft, idempotency_key,"
-                "  status, messages, match_movement_ids, decision)"
-                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "  status, messages, match_movement_ids, decision, transfer)"
+                " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 [
                     [
                         file_id,
@@ -209,6 +211,7 @@ class ImportStore:
                         Jsonb([dict(m) for m in r.messages]),
                         list(r.match_movement_ids),
                         r.decision,
+                        Jsonb(dict(r.transfer)) if r.transfer is not None else None,
                     ]
                     for r in rows
                 ],
@@ -217,7 +220,7 @@ class ImportStore:
     def batch(self, user_id: UUID, batch_id: UUID) -> StoredBatch | None:
         conn = self._conn
         head = conn.execute(
-            "select id, status, created_at, finished_at, warnings from imports.batches"
+            "select id, status, created_at, finished_at, warnings, suggestions from imports.batches"
             " where user_id = %s and id = %s",
             [user_id, batch_id],
         ).fetchone()
@@ -248,6 +251,7 @@ class ImportStore:
                     messages=tuple(r["messages"]),
                     match_movement_ids=tuple(r["match_movement_ids"]),
                     decision=r["decision"],
+                    transfer=r["transfer"],
                     movement_id=r["movement_id"],
                 )
             )
@@ -257,6 +261,7 @@ class ImportStore:
             created_at=head["created_at"],
             finished_at=head["finished_at"],
             warnings=tuple(head["warnings"]),
+            suggestions=tuple(head["suggestions"]),
             files=tuple(
                 StoredFile(
                     id=f["id"],
@@ -294,6 +299,35 @@ class ImportStore:
             )
             for r in rows
         ]
+
+    def set_suggestions(
+        self, user_id: UUID, batch_id: UUID, suggestions: Sequence[Mapping[str, Any]]
+    ) -> None:
+        self._conn.execute(
+            "update imports.batches set suggestions = %s where user_id = %s and id = %s",
+            [Jsonb([dict(x) for x in suggestions]), user_id, batch_id],
+        )
+
+    def update_rows(self, user_id: UUID, rows: Sequence[StoredRow]) -> None:
+        """Regrava status, mensagens, duplicados e decisão (depois de conferir de novo)."""
+        if not rows:
+            return
+        with self._conn.cursor() as cur:
+            cur.executemany(
+                "update imports.rows set status = %s, messages = %s, match_movement_ids = %s,"
+                "  decision = %s where user_id = %s and id = %s",
+                [
+                    [
+                        r.status,
+                        Jsonb([dict(m) for m in r.messages]),
+                        list(r.match_movement_ids),
+                        r.decision,
+                        user_id,
+                        r.id,
+                    ]
+                    for r in rows
+                ],
+            )
 
     def record_results(
         self,

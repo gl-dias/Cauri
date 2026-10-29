@@ -27,6 +27,7 @@ from cauri_ledger.models import (
     MovementNotFoundError,
     MovementPatch,
     PostResult,
+    Shortfall,
 )
 from cauri_ledger.service import Ledger
 from cauri_ledger.staging import (
@@ -62,6 +63,7 @@ __all__ = [
     "MovementPatch",
     "PostResult",
     "RowStatus",
+    "Shortfall",
     "StagedFile",
     "StagedRow",
     "StoredBatch",

@@ -44,6 +44,8 @@ class ManualEntryForm:
     fi_maturity: date | None = None
     fi_label: str | None = None
     notes: str | None = None
+    # Saldo inicial: compra marcada, com o custo médio da posição anterior ao histórico.
+    opening_balance: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +123,8 @@ def to_draft(form: ManualEntryForm) -> MovementDraft:
         factor=_number("factor", form.factor),
         income_kind=form.income_kind,
         notes=_clean(form.notes),
+        origin_label="Saldo inicial" if form.opening_balance else None,
+        opening_balance=form.opening_balance,
     )
 
 

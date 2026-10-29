@@ -160,6 +160,15 @@ def check_shape(draft: MovementDraft, today: date) -> list[Issue]:
     ):
         issues.append(Issue(IssueCode.INVALID, "Taxa em outro ativo incompleta.", "fee_asset"))
 
+    if draft.opening_balance and (t is not MovementType.COMPRA or is_fixed_income):
+        issues.append(
+            Issue(
+                IssueCode.NOT_ALLOWED,
+                "Saldo inicial é uma compra de ativo negociado (ação, FII, Tesouro, cripto).",
+                "opening_balance",
+            )
+        )
+
     fi = draft.fixed_income
     if fi is not None:
         if not fi.issuer_name.strip():

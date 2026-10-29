@@ -195,7 +195,8 @@ def existing_keys(conn: Conn, user_id: UUID, keys: Collection[str]) -> dict[str,
 
 _MOVEMENT_COLUMNS = (
     "id, trade_date, type, broker_id, asset_id, instrument_id, quantity, unit_price, fees,"
-    " amount, factor, income_kind, origin, origin_label, idempotency_key, voided_at, notes"
+    " amount, factor, income_kind, origin, origin_label, idempotency_key, voided_at, notes,"
+    " opening_balance"
 )
 
 
@@ -214,6 +215,7 @@ def to_movement(row: Mapping[str, Any], seq: int) -> Movement:
         factor=row["factor"],
         income_kind=IncomeKind(row["income_kind"]) if row["income_kind"] else None,
         seq=seq,
+        opening_balance=row["opening_balance"],
     )
 
 

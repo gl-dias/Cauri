@@ -66,6 +66,8 @@ class MovementDraft:
     # Taxa como foi paga (0,0001 BNB), já convertida e somada em ``fees``.
     fee_asset: str | None = None
     fee_quantity: Decimal | None = None
+    # Compra marcada como saldo inicial (posição anterior ao histórico, custo informado).
+    opening_balance: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,12 +131,24 @@ class DuplicateCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class Shortfall:
+    """Venda maior que a posição: quanto falta de qual ativo, e em que data."""
+
+    ticker: str
+    trade_date: date
+    available: Decimal
+    missing: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class DraftCheck:
     index: int
     draft: MovementDraft
     errors: tuple[Issue, ...] = ()
     duplicates: tuple[DuplicateCandidate, ...] = ()
     already_posted: UUID | None = None  # mesma chave de idempotência já gravada
+    # Venda descoberta deste rascunho: base para oferecer um saldo inicial.
+    shortfall: Shortfall | None = None
 
     @property
     def ok(self) -> bool:
