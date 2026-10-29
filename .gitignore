@@ -35,6 +35,7 @@ pg_dump*
 *.pdf
 !backend/packages/*/tests/fixtures/**
 !reference/import-template/**
+!web/public/templates/**
 
 # Python
 __pycache__/

@@ -40,11 +40,53 @@ export type ChecksOut = { ok: boolean; checks: DraftCheck[] };
 export type PostOut = { created: string[]; already_posted: string[]; snapshots_updated: boolean };
 export type AllowlistEntry = { email: string; role: "admin" | "user"; note: string | null; added_at: string };
 
+export type ImportDecision = "import" | "keep_existing" | "replace" | "import_new";
+export type ImportRowStatus = "ok" | "error" | "already_imported" | "possible_duplicate" | "ignored";
+export type ImportMessage = { level: "error" | "warning" | "info"; text: string };
+export type ImportDraft = {
+  trade_date: string;
+  type: MovementType;
+  ticker: string | null;
+  asset_label: string;
+  broker_id: string;
+  broker_name: string;
+  quantity: string | null;
+  unit_price: string | null;
+  fees: string | null;
+  amount: string | null;
+  factor: string | null;
+  income_kind: "dividendo" | "jcp" | "rendimento" | "juros" | null;
+};
+export type ImportRow = {
+  id: string;
+  line_numbers: number[];
+  status: ImportRowStatus;
+  decision: ImportDecision | null;
+  messages: ImportMessage[];
+  raw: Record<string, string>;
+  draft: ImportDraft | null;
+  match_movement_ids: string[];
+  movement_id: string | null;
+};
+export type ImportFile = { id: string; label: string; adapter: string; rows: ImportRow[]; counts: Partial<Record<ImportRowStatus, number>> };
+export type ImportBatch = {
+  id: string;
+  status: "preview" | "committed" | "discarded";
+  created_at: string;
+  finished_at: string | null;
+  warnings: string[];
+  files: ImportFile[];
+  counts: Partial<Record<ImportRowStatus, number>>;
+};
+export type ImportPreview = { batch: ImportBatch | null; problems: { index: number; message: string }[]; file_indexes: number[] };
+export type ImportSummary = { id: string; status: ImportBatch["status"]; created_at: string; finished_at: string | null; labels: string[]; imported: number };
+export type ImportCommitOut = { created: number; already_imported: number; replaced: number; skipped: number; snapshots_updated: boolean };
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
-    readonly body: { detail?: string; checks?: DraftCheck[]; issues?: CheckIssue[]; field?: string } = {},
+    readonly body: { detail?: string; checks?: DraftCheck[]; issues?: CheckIssue[]; field?: string; messages?: string[] } = {},
   ) {
     super(message);
   }
@@ -55,13 +97,15 @@ export type ApiClient = ReturnType<typeof createApi>;
 export function createApi(baseUrl: string, token: () => Promise<string | null>) {
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const jwt = await token();
+    // FormData (envio de arquivos) leva o Content-Type com o boundary que o navegador gera.
+    const isForm = body instanceof FormData;
     const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
       method,
       headers: {
-        "Content-Type": "application/json",
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
     if (response.status === 204) return undefined as T;
     const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
@@ -77,6 +121,18 @@ export function createApi(baseUrl: string, token: () => Promise<string | null>) 
     postManual: (entries: ManualEntry[]) => call<PostOut>("POST", "/v1/movements", { entries }),
     editMovement: (id: string, patch: MovementPatch) => call<void>("PATCH", `/v1/movements/${id}`, patch),
     voidMovement: (id: string, reason: string) => call<void>("POST", `/v1/movements/${id}/void`, { reason }),
+    imports: {
+      preview: (files: File[]) => {
+        const form = new FormData();
+        for (const file of files) form.append("files", file, file.name);
+        return call<ImportPreview>("POST", "/v1/imports", form);
+      },
+      recent: () => call<ImportSummary[]>("GET", "/v1/imports"),
+      get: (id: string) => call<ImportBatch>("GET", `/v1/imports/${id}`),
+      commit: (id: string, decisions: Record<string, ImportDecision>) =>
+        call<ImportCommitOut>("POST", `/v1/imports/${id}/commit`, { decisions }),
+      discard: (id: string) => call<void>("POST", `/v1/imports/${id}/discard`),
+    },
     allowlist: {
       list: () => call<AllowlistEntry[]>("GET", "/v1/admin/allowlist"),
       add: (email: string, role: "admin" | "user", note?: string) =>

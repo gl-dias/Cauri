@@ -19,6 +19,7 @@ applyTheme();
 const HomePage = lazy(() => import("./features/home/HomePage").then((m) => ({ default: m.HomePage })));
 const PortfolioPage = lazy(() => import("./features/portfolio/PortfolioPage").then((m) => ({ default: m.PortfolioPage })));
 const LedgerPage = lazy(() => import("./features/ledger/LedgerPage").then((m) => ({ default: m.LedgerPage })));
+const ImportPage = lazy(() => import("./features/import/ImportPage").then((m) => ({ default: m.ImportPage })));
 const AdminPage = lazy(() => import("./features/admin/AdminPage").then((m) => ({ default: m.AdminPage })));
 const page = (node: React.ReactNode) => <Suspense fallback={null}>{node}</Suspense>;
 
@@ -31,7 +32,7 @@ const appScreens = [
   { index: true, element: page(<HomePage />) },
   { path: "carteira", element: page(<PortfolioPage />) },
   { path: "lancamentos", element: page(<LedgerPage />) },
-  { path: "importar", element: <ComingSoon title="Importar" phase="Fase 4" /> },
+  { path: "importar", element: page(<ImportPage />) },
   { path: "assistente", element: <ComingSoon title="Assistente" phase="Fase 5" /> },
 ];
 
