@@ -1,0 +1,112 @@
+[
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "broker",
+  "bucket_key": "xp",
+  "market_value": 37013.44,
+  "cost_basis": 31693.73,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.236919353237
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "broker",
+  "bucket_key": "nubank",
+  "market_value": 15946.42,
+  "cost_basis": 15000,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.063094666667
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "broker",
+  "bucket_key": "inter",
+  "market_value": 10542.64,
+  "cost_basis": 10000,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.054264
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "broker",
+  "bucket_key": "btg",
+  "market_value": 42135.72,
+  "cost_basis": 39422.42,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.109550829626
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "broker",
+  "bucket_key": "binance",
+  "market_value": 5190.51,
+  "cost_basis": 8508.17,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 0.563668835647
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "class",
+  "bucket_key": "tesouro",
+  "market_value": 14582.21,
+  "cost_basis": 13933.91,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.046526722419
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "class",
+  "bucket_key": "renda_fixa",
+  "market_value": 26489.06,
+  "cost_basis": 25000,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.0595624
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "class",
+  "bucket_key": "fii",
+  "market_value": 22451.26,
+  "cost_basis": 21685.47,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.089413280653
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "class",
+  "bucket_key": "cripto",
+  "market_value": 5190.51,
+  "cost_basis": 8508.17,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 0.563668835647
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "snap_date": "2026-03-26",
+  "bucket_kind": "class",
+  "bucket_key": "acao",
+  "market_value": 42115.69,
+  "cost_basis": 35496.77,
+  "net_flows": 0,
+  "income": 0,
+  "quota_value": 1.269886195848
+ }
+]

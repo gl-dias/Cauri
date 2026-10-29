@@ -1,0 +1,27 @@
+[
+ {
+  "id": "inter",
+  "name": "Banco Inter",
+  "kind": "banco"
+ },
+ {
+  "id": "binance",
+  "name": "Binance",
+  "kind": "exchange"
+ },
+ {
+  "id": "btg",
+  "name": "BTG Pactual",
+  "kind": "corretora"
+ },
+ {
+  "id": "nubank",
+  "name": "Nubank",
+  "kind": "banco"
+ },
+ {
+  "id": "xp",
+  "name": "XP Investimentos",
+  "kind": "corretora"
+ }
+]

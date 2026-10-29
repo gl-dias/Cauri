@@ -1,0 +1,122 @@
+[
+ {
+  "id": "0384ebb6-d556-497c-a4fe-cf04e3f5f488",
+  "ticker": "BBAS3",
+  "name": "Brasil ON NM",
+  "class": "acao",
+  "issuer_code": "BBAS",
+  "maturity_date": null
+ },
+ {
+  "id": "c879738d-f07e-4a07-95a4-b2309ed5b249",
+  "ticker": "BTC",
+  "name": "Bitcoin",
+  "class": "cripto",
+  "issuer_code": null,
+  "maturity_date": null
+ },
+ {
+  "id": "05400cc4-ff26-452f-a25b-7398a59ccec2",
+  "ticker": "ETH",
+  "name": "Ethereum",
+  "class": "cripto",
+  "issuer_code": null,
+  "maturity_date": null
+ },
+ {
+  "id": "182c06ab-fca3-4e3c-a484-6b13d271dfd6",
+  "ticker": "HGLG11",
+  "name": "Fii Hglg Pax CI",
+  "class": "fii",
+  "issuer_code": "HGLG",
+  "maturity_date": null
+ },
+ {
+  "id": "b17a04bd-ce56-4d6e-94a7-4e007a387e3c",
+  "ticker": "ITUB4",
+  "name": "Itauunibanco PN N1",
+  "class": "acao",
+  "issuer_code": "ITUB",
+  "maturity_date": null
+ },
+ {
+  "id": "cceb0e93-08f9-4092-8b97-7ebd286953c6",
+  "ticker": "KNRI11",
+  "name": "Fii Kinea CI",
+  "class": "fii",
+  "issuer_code": "KNRI",
+  "maturity_date": null
+ },
+ {
+  "id": "319cb546-7c99-48cf-9ee6-1db63eb4fbc1",
+  "ticker": "MXRF11",
+  "name": "Fii Maxi Ren CI",
+  "class": "fii",
+  "issuer_code": "MXRF",
+  "maturity_date": null
+ },
+ {
+  "id": "fed5d2e1-13b3-4cd4-bb50-5e92612d0505",
+  "ticker": "PETR4",
+  "name": "Petrobras PN N2",
+  "class": "acao",
+  "issuer_code": "PETR",
+  "maturity_date": null
+ },
+ {
+  "id": "361e0cd1-96cb-4ba8-b937-fcb00bcd0ea7",
+  "ticker": "SOL",
+  "name": "Solana",
+  "class": "cripto",
+  "issuer_code": null,
+  "maturity_date": null
+ },
+ {
+  "id": "9c4354dd-8d42-422b-bee3-bcaf775c240e",
+  "ticker": "TAEE11",
+  "name": "Taesa UNT N2",
+  "class": "acao",
+  "issuer_code": "TAEE",
+  "maturity_date": null
+ },
+ {
+  "id": "68320165-d45c-43e8-8496-05d9b33e7a8c",
+  "ticker": "TD-IPCA-15052035",
+  "name": "Tesouro IPCA+ 2035 (15/05/2035)",
+  "class": "tesouro",
+  "issuer_code": "TESOURO",
+  "maturity_date": "2035-05-15"
+ },
+ {
+  "id": "9417bd53-b5c5-4feb-be7a-154a91dae2f2",
+  "ticker": "TD-SELIC-01032028",
+  "name": "Tesouro Selic 2028 (01/03/2028)",
+  "class": "tesouro",
+  "issuer_code": "TESOURO",
+  "maturity_date": "2028-03-01"
+ },
+ {
+  "id": "5afc9948-51c6-424b-ac3d-e2f2675bafdf",
+  "ticker": "VALE3",
+  "name": "Vale ON NM",
+  "class": "acao",
+  "issuer_code": "VALE",
+  "maturity_date": null
+ },
+ {
+  "id": "d580aa38-1da6-45d3-a643-917b67f8d6f5",
+  "ticker": "WEGE3",
+  "name": "Weg ON NM",
+  "class": "acao",
+  "issuer_code": "WEGE",
+  "maturity_date": null
+ },
+ {
+  "id": "8124d895-57e1-447e-a4b1-941701c869e0",
+  "ticker": "XPML11",
+  "name": "Fii Xp Malls CI ER",
+  "class": "fii",
+  "issuer_code": "XPML",
+  "maturity_date": null
+ }
+]

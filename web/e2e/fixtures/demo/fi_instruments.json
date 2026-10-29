@@ -1,0 +1,20 @@
+[
+ {
+  "id": "fe374b19-5533-4584-8dc5-7ca97eb74cae",
+  "kind": "CDB",
+  "issuer_name": "Banco Demo",
+  "rate_pct": 110,
+  "maturity_date": "2027-10-29",
+  "broker_id": "nubank",
+  "label": "CDB Banco Demo 110% CDI 10/2027"
+ },
+ {
+  "id": "e1bfc6f3-bc2b-4efd-94f0-3ec41481fdaf",
+  "kind": "LCI",
+  "issuer_name": "Banco Exemplo",
+  "rate_pct": 95,
+  "maturity_date": "2027-04-29",
+  "broker_id": "inter",
+  "label": "LCI Banco Exemplo 95% CDI 04/2027"
+ }
+]

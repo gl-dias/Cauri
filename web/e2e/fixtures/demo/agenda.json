@@ -1,0 +1,29 @@
+[
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "kind": "provento",
+  "event_date": "2026-11-05",
+  "label": "HGLG11",
+  "amount": 66.25,
+  "detail": "rendimento",
+  "broker_id": "xp"
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "kind": "vencimento",
+  "event_date": "2027-04-29",
+  "label": "LCI Banco Exemplo 95% CDI 04/2027",
+  "amount": 8285.22,
+  "detail": "LCI",
+  "broker_id": "inter"
+ },
+ {
+  "user_id": "00000000-0000-4000-8000-0000000000dd",
+  "kind": "vencimento",
+  "event_date": "2027-10-29",
+  "label": "CDB Banco Demo 110% CDI 10/2027",
+  "amount": 22795.19,
+  "detail": "CDB",
+  "broker_id": "nubank"
+ }
+]
