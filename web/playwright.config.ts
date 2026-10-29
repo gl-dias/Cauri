@@ -19,7 +19,7 @@ export default defineConfig({
     timezoneId: "America/Sao_Paulo",
   },
   webServer: {
-    command: CI ? "npx vite build && npx vite preview --port 4173 --strictPort" : "npx vite --port 5173 --strictPort",
+    command: CI ? "npx vite build && node scripts/pages-headers.mjs && npx vite preview --port 4173 --strictPort" : "npx vite --port 5173 --strictPort",
     url: `http://127.0.0.1:${port}/demo`,
     reuseExistingServer: !CI,
     timeout: 120_000,
