@@ -1,7 +1,7 @@
 -- Invariantes do ledger garantidas pelo banco, independentemente de quem escreve.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(26);
 
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-00000000000a', '00000000-0000-0000-0000-000000000000',
@@ -26,6 +26,16 @@ select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, unit_price, broker_id, origin, idempotency_key)
     values (auth.uid(), date '2026-01-05', '10000000-0000-4000-8000-000000000001', 'compra', 10, 'corretora-a', 'manual', 'sem-quantidade')$$,
   '23514', null, 'compra sem quantidade é recusada');
+
+select throws_ok(
+  $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key, opening_balance)
+    values (auth.uid(), date '2026-01-05', '10000000-0000-4000-8000-000000000001', 'venda', 1, 10, 'corretora-a', 'manual', 'saldo-em-venda', true)$$,
+  '23514', null, 'saldo inicial só existe como compra');
+
+select throws_ok(
+  $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key, orig_currency)
+    values (auth.uid(), date '2026-01-05', '10000000-0000-4000-8000-000000000001', 'compra', 1, 10, 'corretora-a', 'manual', 'moeda-pela-metade', 'USDT')$$,
+  '23514', null, 'moeda original sem cotação é recusada');
 
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
