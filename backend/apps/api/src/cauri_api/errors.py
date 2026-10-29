@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 import cauri_importers as importers
+import cauri_nl_assistant as assistant
 from cauri_api.schemas import DraftCheckOut, IssueOut
 from cauri_ledger import (
     LedgerValidationError,
@@ -59,6 +60,24 @@ def install(app: FastAPI) -> None:
         if isinstance(exc, importers.CommitRejectedError):
             content["messages"] = exc.messages
         return JSONResponse(status_code=code, content=content)
+
+    @app.exception_handler(assistant.AssistantError)
+    async def _assistant(_: Request, exc: assistant.AssistantError) -> JSONResponse:
+        if isinstance(exc, assistant.ProposalNotFoundError):
+            code = status.HTTP_404_NOT_FOUND
+        elif isinstance(exc, assistant.ProposalClosedError):
+            code = status.HTTP_409_CONFLICT
+        else:
+            code = status.HTTP_422_UNPROCESSABLE_CONTENT
+        return JSONResponse(status_code=code, content={"detail": str(exc)})
+
+    @app.exception_handler(assistant.ExtractionError)
+    async def _extraction(_: Request, exc: assistant.ExtractionError) -> JSONResponse:
+        return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content={"detail": str(exc)})
+
+    @app.exception_handler(assistant.TranscriptionError)
+    async def _transcription(_: Request, exc: assistant.TranscriptionError) -> JSONResponse:
+        return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content={"detail": str(exc)})
 
     @app.exception_handler(FormError)
     async def _form(_: Request, exc: FormError) -> JSONResponse:

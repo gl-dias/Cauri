@@ -441,3 +441,103 @@ class TestSaldoInicial:
         assert opening_file["rows"][0]["draft"]["opening_balance"] is True
         res = client.post(f"/v1/imports/{batch['id']}/commit", json={}, headers=auth(user))
         assert res.json()["created"] == 2
+
+
+class FakeTranscriber:
+    def transcribe(self, audio, filename, content_type):
+        return "comprei 2 TSTA3 a 20 reais"
+
+
+@pytest.fixture
+def assistant_client(api_pool, api_url, reference_data):
+    from cauri_nl_assistant import RuleExtractor
+
+    settings = Settings(database_url=api_url, jwt_secret=LOCAL_JWT_SECRET, supabase_url=None)
+    app = create_app(
+        settings, pool=api_pool, extractor=RuleExtractor(), transcriber=FakeTranscriber()
+    )
+    with TestClient(app) as c:
+        yield c
+
+
+class TestAssistente:
+    def prepare(self, client, user):
+        # Uma compra manual para o assistente saber a corretora habitual.
+        client.post("/v1/movements", json={"entries": [entry()]}, headers=auth(user))
+
+    def test_frase_vira_cartao_e_confirmar_grava(self, assistant_client, make_user):
+        user = make_user()
+        self.prepare(assistant_client, user)
+        cfg = assistant_client.get("/v1/assistant/config", headers=auth(user)).json()
+        assert cfg == {"llm": "regras", "model": "regras", "voice": "groq"}
+
+        res = assistant_client.post(
+            "/v1/assistant/messages",
+            json={"text": "comprei 2 TSTA3 a 20 reais"},
+            headers=auth(user),
+        )
+        assert res.status_code == 201
+        body = res.json()
+        user_msg, reply = body["messages"]
+        assert user_msg["role"] == "user"
+        proposal = reply["proposal"]
+        [item] = proposal["items"]
+        assert (item["ticker"], item["status"]) == ("TSTA3", "ok")
+        assert item["draft"]["broker_id"] == "corretora-teste-a"
+
+        res = assistant_client.patch(
+            f"/v1/assistant/proposals/{proposal['id']}/items/{item['id']}",
+            json={"preco": "21,50"},
+            headers=auth(user),
+        )
+        assert res.json()["items"][0]["draft"]["unit_price"] == "21.5"
+
+        res = assistant_client.post(
+            f"/v1/assistant/proposals/{proposal['id']}/confirm", headers=auth(user)
+        )
+        assert res.status_code == 200
+        assert res.json()["status"] == "confirmed"
+
+        conversations = assistant_client.get(
+            "/v1/assistant/conversations", headers=auth(user)
+        ).json()
+        conv = assistant_client.get(
+            f"/v1/assistant/conversations/{conversations[0]['id']}", headers=auth(user)
+        ).json()
+        assert [m["role"] for m in conv["messages"]] == ["user", "assistant", "assistant"]
+        assert conv["messages"][1]["proposal"]["status"] == "confirmed"
+        assert conv["messages"][2]["content"] == "Pronto: 1 movimentação gravada."
+
+    def test_transcricao_pelo_servidor(self, assistant_client, make_user):
+        res = assistant_client.post(
+            "/v1/assistant/transcribe",
+            files=[("audio", ("fala.webm", b"audio", "audio/webm"))],
+            headers=auth(make_user()),
+        )
+        assert res.json() == {"text": "comprei 2 TSTA3 a 20 reais"}
+
+    def test_sem_chave_o_assistente_e_a_voz_ficam_fora(self, client, make_user):
+        user = make_user()
+        cfg = client.get("/v1/assistant/config", headers=auth(user)).json()
+        assert cfg == {"llm": "indisponivel", "model": None, "voice": "navegador"}
+        res = client.post(
+            "/v1/assistant/messages", json={"text": "comprei 1 TSTA3"}, headers=auth(user)
+        )
+        assert res.status_code == 503
+        res = client.post(
+            "/v1/assistant/transcribe",
+            files=[("audio", ("fala.webm", b"audio", "audio/webm"))],
+            headers=auth(user),
+        )
+        assert res.status_code == 503
+
+    def test_cartao_de_outro_usuario_e_404(self, assistant_client, make_user):
+        ana, bruno = make_user(), make_user()
+        self.prepare(assistant_client, ana)
+        reply = assistant_client.post(
+            "/v1/assistant/messages", json={"text": "comprei 1 TSTA3 a 20"}, headers=auth(ana)
+        ).json()["messages"][1]
+        res = assistant_client.post(
+            f"/v1/assistant/proposals/{reply['proposal']['id']}/confirm", headers=auth(bruno)
+        )
+        assert res.status_code == 404

@@ -1,8 +1,11 @@
-"""Configuração da API, só por variável de ambiente (prefixo ``CAURI_``)."""
+"""Configuração da API, só por variável de ambiente (prefixo ``CAURI_``; as chaves dos
+provedores usam o nome padrão de cada um, como no ``.env.example``)."""
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Literal
+
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,3 +23,14 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://127.0.0.1:5173", "http://localhost:5173"]
     )
     db_pool_max: int = 5
+    # Assistente: Haiku com saída estruturada. "regras" é só para desenvolvimento e testes
+    # sem chave (entende frases simples). Sem chave e sem "regras", o assistente fica fora.
+    anthropic_api_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("ANTHROPIC_API_KEY", "CAURI_ANTHROPIC_API_KEY")
+    )
+    anthropic_model: str = "claude-haiku-5-5"
+    assistant_extractor: Literal["anthropic", "regras"] = "anthropic"
+    # Transcrição de voz (Whisper pela Groq). Sem chave, o front usa a do navegador.
+    groq_api_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("GROQ_API_KEY", "CAURI_GROQ_API_KEY")
+    )

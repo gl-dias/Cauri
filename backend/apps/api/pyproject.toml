@@ -10,6 +10,7 @@ dependencies = [
   "cauri-ledger",
   "cauri-manual-entry",
   "cauri-importers",
+  "cauri-nl-assistant",
   "fastapi>=0.120",
   "python-multipart>=0.0.20",
   "uvicorn[standard]>=0.38",
@@ -24,6 +25,7 @@ cauri-engine = { workspace = true }
 cauri-ledger = { workspace = true }
 cauri-manual-entry = { workspace = true }
 cauri-importers = { workspace = true }
+cauri-nl-assistant = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.9,<0.14"]

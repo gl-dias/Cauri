@@ -317,3 +317,72 @@ class ProfileOut(BaseModel):
     options: dict[str, Any]
     created_at: datetime
     last_used_at: datetime | None
+
+
+# Assistente -------------------------------------------------------------------------
+
+
+class AssistantConfigOut(BaseModel):
+    llm: Literal["anthropic", "regras", "indisponivel"]
+    model: str | None
+    voice: Literal["groq", "navegador"]
+
+
+class MessageIn(_In):
+    text: str = Field(min_length=1, max_length=2000)
+    conversation_id: UUID | None = None
+    input_mode: Literal["texto", "voz"] = "texto"
+
+
+class ProposalOut(BaseModel):
+    """Cartão de confirmação. Os itens já vêm resolvidos e conferidos (números como texto)."""
+
+    id: UUID
+    message_id: UUID
+    status: Literal["pending", "confirmed", "cancelled"]
+    items: list[dict[str, Any]]
+    suggestions: list[OpeningSuggestionOut]
+
+
+class MessageOut(BaseModel):
+    id: UUID
+    role: Literal["user", "assistant"]
+    content: str
+    input_mode: str | None
+    created_at: datetime
+    proposal: ProposalOut | None = None
+
+
+class SendOut(BaseModel):
+    conversation_id: UUID
+    messages: list[MessageOut]
+
+
+class ConversationSummaryOut(BaseModel):
+    id: UUID
+    title: str
+    updated_at: datetime
+
+
+class ConversationOut(BaseModel):
+    id: UUID
+    title: str
+    messages: list[MessageOut]
+
+
+class AnswerIn(_In):
+    field: Literal["ticker", "broker_id"]
+    value: str = Field(min_length=1, max_length=60)
+
+
+class EditItemIn(_In):
+    quantidade: str | None = NumberText
+    preco: str | None = NumberText
+    moeda: str | None = Field(default=None, pattern=r"^[A-Z0-9]{2,12}$")
+    data: date | None = None
+    ticker: str | None = Field(default=None, max_length=40)
+    broker_id: str | None = Field(default=None, max_length=60)
+
+
+class TranscriptionOut(BaseModel):
+    text: str
