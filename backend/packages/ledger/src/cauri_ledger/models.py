@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
-from cauri_core import FiKind, IncomeKind, MovementType, Origin
+from cauri_core import AssetClass, FiKind, IncomeKind, MovementType, Origin
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +54,7 @@ class MovementDraft:
     factor: Decimal | None = None
     income_kind: IncomeKind | None = None
     notes: str | None = None
+    origin_label: str | None = None  # sobrepõe o rótulo do envio ("B3", "Planilha")
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,17 @@ class MovementPatch:
     notes: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class CatalogAsset:
+    """Ativo do cadastro de mercado, como os canais de entrada precisam ver."""
+
+    ticker: str
+    asset_class: AssetClass
+    name: str
+    maturity_date: date | None
+    active: bool
+
+
 class IssueCode(StrEnum):
     REQUIRED = "required"
     INVALID = "invalid"
@@ -85,6 +97,7 @@ class IssueCode(StrEnum):
     OVERSELL = "oversell"
     REDEMPTION_EXCEEDS_BALANCE = "redemption_exceeds_balance"
     NOT_ALLOWED = "not_allowed"
+    STALE = "stale"  # a carteira mudou entre a conferência e a gravação
 
 
 @dataclass(frozen=True, slots=True)

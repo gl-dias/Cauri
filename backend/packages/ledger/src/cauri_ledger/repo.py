@@ -18,7 +18,7 @@ from cauri_core import (
     MovementType,
     Origin,
 )
-from cauri_ledger.models import DuplicateCandidate, FixedIncomeDraft
+from cauri_ledger.models import CatalogAsset, DuplicateCandidate, FixedIncomeDraft
 from cauri_storage import Conn
 
 
@@ -52,6 +52,40 @@ def find_assets_by_id(conn: Conn, ids: Collection[UUID]) -> dict[UUID, AssetRef]
     return {
         r["id"]: AssetRef(r["id"], r["ticker"], AssetClass(r["class"]), r["active"]) for r in rows
     }
+
+
+def catalog_assets(conn: Conn, tickers: Collection[str]) -> dict[str, CatalogAsset]:
+    if not tickers:
+        return {}
+    rows = conn.execute(
+        "select ticker, class, name, maturity_date, active from market.assets"
+        " where ticker = any(%s)",
+        [list(tickers)],
+    ).fetchall()
+    return {r["ticker"]: _catalog(r) for r in rows}
+
+
+def tesouro_assets(conn: Conn) -> list[CatalogAsset]:
+    rows = conn.execute(
+        "select ticker, class, name, maturity_date, active from market.assets"
+        " where class = 'tesouro' order by maturity_date, ticker"
+    ).fetchall()
+    return [_catalog(r) for r in rows]
+
+
+def _catalog(row: Mapping[str, Any]) -> CatalogAsset:
+    return CatalogAsset(
+        ticker=row["ticker"],
+        asset_class=AssetClass(row["class"]),
+        name=row["name"],
+        maturity_date=row["maturity_date"],
+        active=row["active"],
+    )
+
+
+def all_brokers(conn: Conn) -> dict[str, str]:
+    rows = conn.execute("select id, name from market.brokers order by name").fetchall()
+    return {r["id"]: r["name"] for r in rows}
 
 
 def find_brokers(conn: Conn, ids: Collection[str]) -> set[str]:
@@ -173,6 +207,17 @@ def active_movements(
     return [to_movement(r, i) for i, r in enumerate(rows)]
 
 
+def active_movements_by_ids(conn: Conn, user_id: UUID, ids: Collection[UUID]) -> list[Movement]:
+    if not ids:
+        return []
+    rows = conn.execute(
+        f"select {_MOVEMENT_COLUMNS} from ledger.movements"
+        " where user_id = %s and voided_at is null and id = any(%s)",
+        [user_id, list(ids)],
+    ).fetchall()
+    return [to_movement(r, 0) for r in rows]
+
+
 def get_movement(conn: Conn, user_id: UUID, movement_id: UUID) -> dict[str, Any] | None:
     return conn.execute(
         f"select {_MOVEMENT_COLUMNS} from ledger.movements where user_id = %s and id = %s",
@@ -186,9 +231,17 @@ def duplicate_candidates(
     origin: Origin,
     idempotency_key: str,
     movement: Movement,
+    *,
+    source_prefix: str | None = None,
+    exclude_ids: Collection[UUID] = (),
 ) -> list[DuplicateCandidate]:
     """Mesma operação já gravada por outra origem: mesmo ativo, data, tipo e quantidade
-    (ou valor, para aporte, resgate e provento; ou fator, para eventos)."""
+    (ou valor, para aporte, resgate e provento; ou fator, para eventos).
+
+    "Outra origem" é outro canal (manual, chat, importação). Com ``source_prefix``, que
+    as importações usam, é tudo o que não veio da mesma fonte: a B3 e a planilha genérica
+    são importações as duas, mas uma pode repetir a outra.
+    """
     target_column = "asset_id" if movement.asset_id is not None else "instrument_id"
     if movement.type in {MovementType.COMPRA, MovementType.VENDA}:
         measure_column, measure = "quantity", movement.quantity
@@ -196,14 +249,21 @@ def duplicate_candidates(
         measure_column, measure = "factor", movement.factor
     else:
         measure_column, measure = "amount", movement.amount
+    if source_prefix is None:
+        other_source, other_value = "origin <> %s", origin.value
+    else:
+        other_source, other_value = "not starts_with(idempotency_key, %s)", source_prefix
     rows = conn.execute(
         "select id, origin, origin_label, trade_date from ledger.movements"
-        " where user_id = %s and voided_at is null and origin <> %s and idempotency_key <> %s"
-        f"   and {target_column} = %s and trade_date = %s and type = %s and {measure_column} = %s",
+        f" where user_id = %s and voided_at is null and {other_source}"
+        "   and idempotency_key <> %s and not (id = any(%s))"
+        f"   and {target_column} = %s and trade_date = %s and type = %s and {measure_column} = %s"
+        " order by created_at, id",
         [
             user_id,
-            origin.value,
+            other_value,
             idempotency_key,
+            list(exclude_ids),
             movement.position_key,
             movement.trade_date,
             movement.type.value,

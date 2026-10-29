@@ -9,7 +9,7 @@ algo mudou no meio do caminho; as constraints do banco são a última linha.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
@@ -26,6 +26,7 @@ from cauri_engine.calc import (
 )
 from cauri_ledger import repo
 from cauri_ledger.models import (
+    CatalogAsset,
     DraftCheck,
     DuplicateCandidate,
     Issue,
@@ -37,10 +38,17 @@ from cauri_ledger.models import (
     MovementPatch,
     PostResult,
 )
+from cauri_ledger.staging import ImportStore
 from cauri_ledger.validation import check_class, check_shape
 from cauri_storage import Conn
 
 _ORIGIN_LABELS = {Origin.MANUAL: "Manual", Origin.CHAT: "Chat", Origin.IMPORT: "Planilha"}
+
+
+def _source_of(key: str) -> str:
+    """Fonte de uma chave ``<fonte>:<id>``: tudo até o último dois-pontos, inclusive."""
+    head, sep, _ = key.rpartition(":")
+    return f"{head}{sep}" if sep else key
 
 
 @dataclass(slots=True)
@@ -67,9 +75,26 @@ class Ledger:
     # Conferência ----------------------------------------------------------------
 
     def check(
-        self, user_id: UUID, drafts: Sequence[MovementDraft], *, origin: Origin
+        self,
+        user_id: UUID,
+        drafts: Sequence[MovementDraft],
+        *,
+        origin: Origin,
+        by_source: bool = False,
+        replacing: Mapping[str, UUID] | None = None,
+        duplicates_neutral: bool = False,
     ) -> list[DraftCheck]:
+        """Confere os rascunhos contra a carteira atual.
+
+        ``by_source`` (importações): as chaves têm o formato ``<fonte>:<id>`` e duplicado
+        provável é a mesma operação vinda de qualquer outra fonte, inclusive outra
+        importação. ``replacing`` liga a chave de um rascunho à movimentação que ele vai
+        substituir: a antiga sai da simulação. ``duplicates_neutral`` (pré-visualização
+        de importação): rascunho com duplicado provável não soma na simulação, porque o
+        padrão é manter o existente; uma venda repetida não vira "venda descoberta".
+        """
         conn = self._conn
+        excluded = set((replacing or {}).values())
         errors: list[list[Issue]] = [check_shape(d, self.today) for d in drafts]
 
         seen: dict[str, int] = {}
@@ -87,28 +112,37 @@ class Ledger:
         resolved = self._resolve(user_id, drafts, errors)
         posted = repo.existing_keys(conn, user_id, [d.idempotency_key for d in drafts])
 
-        simulate = [
+        candidates = [
             i for i, d in enumerate(drafts) if not errors[i] and d.idempotency_key not in posted
         ]
-        self._simulate_timeline(user_id, drafts, resolved, simulate, errors)
+        duplicates: dict[int, tuple[DuplicateCandidate, ...]] = {}
+        for i in candidates:
+            d = drafts[i]
+            movement = self._as_movement(d, resolved[i], seq=0)
+            if movement.asset_id is not None or not resolved[i].instrument_is_new:
+                found = repo.duplicate_candidates(
+                    conn,
+                    user_id,
+                    origin,
+                    d.idempotency_key,
+                    movement,
+                    source_prefix=_source_of(d.idempotency_key) if by_source else None,
+                    exclude_ids=excluded,
+                )
+                if found:
+                    duplicates[i] = tuple(found)
+
+        simulate = [i for i in candidates if not (duplicates_neutral and i in duplicates)]
+        self._simulate_timeline(user_id, drafts, resolved, simulate, errors, excluded)
 
         checks: list[DraftCheck] = []
         for i, d in enumerate(drafts):
-            duplicates: tuple[DuplicateCandidate, ...] = ()
-            if not errors[i] and d.idempotency_key not in posted:
-                movement = self._as_movement(d, resolved[i], seq=0)
-                if movement.asset_id is not None or not resolved[i].instrument_is_new:
-                    duplicates = tuple(
-                        repo.duplicate_candidates(
-                            conn, user_id, origin, d.idempotency_key, movement
-                        )
-                    )
             checks.append(
                 DraftCheck(
                     index=i,
                     draft=d,
                     errors=tuple(errors[i]),
-                    duplicates=duplicates,
+                    duplicates=() if errors[i] else duplicates.get(i, ()),
                     already_posted=posted.get(d.idempotency_key),
                 )
             )
@@ -222,8 +256,12 @@ class Ledger:
         resolved: list[_Resolved],
         indexes: list[int],
         errors: list[list[Issue]],
+        excluded: Collection[UUID] = (),
     ) -> None:
-        """Simula a linha do tempo com os rascunhos e marca os que a quebrariam."""
+        """Simula a linha do tempo com os rascunhos e marca os que a quebrariam.
+
+        ``excluded``: movimentações que serão substituídas e por isso saem da simulação.
+        """
         if not indexes:
             return
         asset_ids = {resolved[i].asset_id for i in indexes if resolved[i].asset_id}
@@ -232,9 +270,13 @@ class Ledger:
             for i in indexes
             if resolved[i].instrument_id and resolved[i].asset_id is None
         }
-        existing = repo.active_movements(
-            self._conn, user_id, {a for a in asset_ids if a}, {x for x in instrument_ids if x}
-        )
+        existing = [
+            m
+            for m in repo.active_movements(
+                self._conn, user_id, {a for a in asset_ids if a}, {x for x in instrument_ids if x}
+            )
+            if m.id not in excluded
+        ]
         base_seq = len(existing)
         simulated: dict[UUID, int] = {}
         draft_movements: list[Movement] = []
@@ -343,8 +385,22 @@ class Ledger:
         origin: Origin,
         origin_ref: UUID | None = None,
         origin_label: str | None = None,
+        by_source: bool = False,
+        replacing: Mapping[str, UUID] | None = None,
+        replace_reason: str | None = None,
     ) -> PostResult:
-        checks = self.check(user_id, drafts, origin=origin)
+        """Grava os rascunhos depois da confirmação, tudo ou nada.
+
+        Com ``replacing``, cada movimentação substituída é removida (com motivo, no
+        histórico) na mesma transação em que a nova entra.
+        """
+        replacing = dict(replacing or {})
+        if set(replacing) - {d.idempotency_key for d in drafts}:
+            raise ValueError("substituição sem rascunho correspondente")
+        self._assert_replaceable(user_id, drafts, replacing)
+        checks = self.check(
+            user_id, drafts, origin=origin, by_source=by_source, replacing=replacing
+        )
         if any(not c.ok for c in checks):
             raise LedgerValidationError(checks)
 
@@ -384,7 +440,7 @@ class Ledger:
                     "broker_id": d.broker_id,
                     "origin": origin.value,
                     "origin_ref": origin_ref,
-                    "origin_label": origin_label or _ORIGIN_LABELS[origin],
+                    "origin_label": d.origin_label or origin_label or _ORIGIN_LABELS[origin],
                     "idempotency_key": d.idempotency_key,
                     "notes": d.notes,
                 },
@@ -394,7 +450,71 @@ class Ledger:
                 already.append(existing[d.idempotency_key])
             else:
                 created.append(new_id)
+                old_id = replacing.get(d.idempotency_key)
+                if old_id is not None:
+                    repo.void_movement(
+                        conn, user_id, old_id, replace_reason or "Substituída por outra origem."
+                    )
         return PostResult(created=tuple(created), already_posted=tuple(already))
+
+    def _assert_replaceable(
+        self, user_id: UUID, drafts: Sequence[MovementDraft], replacing: Mapping[str, UUID]
+    ) -> None:
+        """A movimentação substituída precisa existir, estar ativa e ser do mesmo ativo."""
+        if not replacing:
+            return
+        conn = self._conn
+        active = {m.id: m for m in repo.active_movements_by_ids(conn, user_id, replacing.values())}
+        assets = repo.find_assets(conn, {d.ticker.strip().upper() for d in drafts if d.ticker})
+        used: set[UUID] = set()
+        failing: list[DraftCheck] = []
+        for i, d in enumerate(drafts):
+            old_id = replacing.get(d.idempotency_key)
+            if old_id is None:
+                continue
+            old = active.get(old_id)
+            asset = assets.get(d.ticker.strip().upper()) if d.ticker else None
+            if old is None:
+                message = "A movimentação a substituir não existe mais ou já foi removida."
+            elif old_id in used:
+                message = "A mesma movimentação foi escolhida para duas substituições."
+            elif asset is not None and old.asset_id != asset.id:
+                message = "A movimentação a substituir é de outro ativo."
+            else:
+                used.add(old_id)
+                continue
+            failing.append(DraftCheck(index=i, draft=d, errors=(Issue(IssueCode.STALE, message),)))
+        if failing:
+            raise LedgerValidationError(failing)
+
+    # Catálogo: leitura do cadastro de mercado para os canais de entrada -----------
+
+    def assets(self, tickers: Collection[str]) -> dict[str, CatalogAsset]:
+        return repo.catalog_assets(self._conn, {t.strip().upper() for t in tickers})
+
+    def tesouro_titles(self) -> list[CatalogAsset]:
+        return repo.tesouro_assets(self._conn)
+
+    def brokers(self) -> dict[str, str]:
+        """Corretoras cadastradas: id -> nome."""
+        return repo.all_brokers(self._conn)
+
+    def timeline(
+        self, user_id: UUID, tickers: Collection[str]
+    ) -> tuple[dict[str, UUID], list[Movement]]:
+        """Ids dos ativos e as movimentações ativas deles, para simular a posição."""
+        found = repo.find_assets(self._conn, {t.strip().upper() for t in tickers})
+        ids = {ticker: ref.id for ticker, ref in found.items()}
+        return ids, repo.active_movements(self._conn, user_id, set(ids.values()), ())
+
+    def ids_for_keys(self, user_id: UUID, keys: Collection[str]) -> dict[str, UUID]:
+        """Movimentação gravada (ativa ou removida) de cada chave de idempotência."""
+        return repo.existing_keys(self._conn, user_id, list(keys))
+
+    @property
+    def imports(self) -> ImportStore:
+        """Lotes de importação (pré-visualização e histórico)."""
+        return ImportStore(self._conn)
 
     # Edição e remoção -----------------------------------------------------------
 
