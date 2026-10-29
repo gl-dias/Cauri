@@ -1,10 +1,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
-import { mockDemo } from "./mocks";
+import { openScreen, SCREENS } from "./screens";
 
 /**
  * Contraste AA dos textos sobre o vidro. O fundo real atrás de cada texto (foto + véu +
@@ -38,29 +38,18 @@ const median = (values: number[]) => {
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 };
 
-/** Telas verificadas: caminho e um texto que indica que a tela terminou de carregar. */
-export const SCREENS: { name: string; path: string; ready: string }[] = [
-  { name: "inicio", path: "/demo", ready: "Patrimônio total" },
-];
-
-async function open(page: Page, screen: (typeof SCREENS)[number]) {
-  await mockDemo(page);
-  await page.goto(screen.path);
-  await expect(page.getByText(screen.ready).first()).toBeVisible();
-  await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(800);
-}
-
 for (const screen of SCREENS) {
   test(`contraste AA: ${screen.name}`, async ({ page }, info) => {
-    await open(page, screen);
+    await openScreen(page, screen);
     const shot = await page.screenshot();
     const { data, info: img } = await sharp(shot).raw().toBuffer({ resolveWithObject: true });
     const scale = img.width / page.viewportSize()!.width;
 
     const samples: Sample[] = await page.evaluate(() => {
       const out: Sample[] = [];
-      const walker = document.createTreeWalker(document.querySelector("#root")!, NodeFilter.SHOW_TEXT);
+      // Com um diálogo aberto, o resto da página fica inerte atrás do véu: mede só o diálogo.
+      const root = document.querySelector("[role='dialog']") ?? document.querySelector("#root")!;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
         const node = walker.currentNode as Text;
         const text = node.textContent?.trim();
@@ -107,7 +96,13 @@ for (const screen of SCREENS) {
       const x1 = Math.min(img.width, Math.round(Math.min(s.x + s.w + 6, lim.x + lim.w) * scale));
       const y1 = Math.min(img.height, Math.round(Math.min(s.y + s.h + 6, lim.y + lim.h) * scale));
       const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+      // Em selos e pílulas, os cantos arredondados mostram o fundo de fora: amostra só as
+      // faixas laterais, na altura do miolo do texto, que ficam dentro da pílula.
+      const band = s.clip
+        ? { y0: (s.y + s.h * 0.25) * scale, y1: (s.y + s.h * 0.75) * scale }
+        : { y0: -1e9, y1: 1e9 };
       for (let y = y0; y < y1; y++) {
+        if (y < band.y0 || y > band.y1) continue;
         for (let x = x0; x < x1; x++) {
           if (x >= inner.x0 && x <= inner.x1 && y >= inner.y0 && y <= inner.y1) continue;
           const i = (y * img.width + x) * img.channels;
