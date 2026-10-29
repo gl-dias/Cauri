@@ -25,7 +25,7 @@ from uuid import UUID, uuid4
 from cauri_core import CORPORATE_EVENTS, Movement, MovementType, Origin
 from cauri_engine.calc import replay
 from cauri_importers import brokers as broker_names
-from cauri_importers import drafts, fx, opening, registry
+from cauri_importers import drafts, fx, registry
 from cauri_importers.adapters.mapped import MappedAdapter
 from cauri_importers.model import (
     Adapter,
@@ -50,6 +50,8 @@ from cauri_ledger import (
     StagedRow,
     StoredBatch,
     StoredRow,
+    duplicate_texts,
+    opening,
 )
 
 MAX_FILES = 10
@@ -541,13 +543,8 @@ def _verdict(
         return (
             "possible_duplicate",
             tuple(
-                {
-                    "level": "warning",
-                    "text": f"Parece a mesma operação já lançada por "
-                    f"{dup.origin_label or dup.origin.value} em {dup.trade_date:%d/%m/%Y}.",
-                    "check": True,
-                }
-                for dup in check.duplicates
+                {"level": "warning", "text": text, "check": True}
+                for text in duplicate_texts(check.duplicates)
             ),
             tuple(dup.movement_id for dup in check.duplicates),
             "keep_existing",
