@@ -88,7 +88,8 @@ def _brapi(
     if not is_b3_trading_day(day):
         result.status, result.error = "skipped", "sem pregão na B3 hoje"
         return result
-    todo = [a for a in assets if a.id not in _priced_on(conn, [a.id for a in assets], day)]
+    priced = _priced_on(conn, [a.id for a in assets], day)
+    todo = [a for a in assets if a.id not in priced]
     result.requested = len(todo)
     if not todo:
         result.status = "skipped"
@@ -139,7 +140,8 @@ def _brapi(
     _add_quota(conn, "brapi", day, calls)
     result.rows = store.upsert_prices(conn, rows, run_id)
     result.succeeded = len(rows)
-    waiting = [t for t in pending if t in {a.ticker for a in todo}]
+    todo_tickers = {a.ticker for a in todo}
+    waiting = [t for t in pending if t in todo_tickers]
     if stopped_by_quota:
         result.status = "quota_exceeded"
     elif waiting or result.failed:
@@ -160,7 +162,8 @@ def _coingecko(
     client: httpx.Client,
     api_key: str | None,
 ) -> SourceResult:
-    todo = [a for a in assets if a.id not in _priced_on(conn, [a.id for a in assets], day)]
+    already = _priced_on(conn, [a.id for a in assets], day)
+    todo = [a for a in assets if a.id not in already]
     result = SourceResult(source="coingecko", requested=len(todo))
     if not todo:
         result.status = "skipped"
@@ -201,7 +204,8 @@ def _tesouro(
         if is_b3_trading_day(day)
         else previous_trading_day(day + timedelta(days=1))
     )
-    todo = [a for a in assets if a.id not in _priced_on(conn, [a.id for a in assets], expected)]
+    already = _priced_on(conn, [a.id for a in assets], expected)
+    todo = [a for a in assets if a.id not in already]
     result = SourceResult(source="tesouro", requested=len(todo))
     if not todo:
         result.status = "skipped"
