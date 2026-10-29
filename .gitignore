@@ -1,0 +1,72 @@
+# Segredos e configuração local (só o .env.example vai para o git)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Dumps e backups de banco: podem conter dados reais
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.sql.zip
+*.tar.gz
+dump*.sql
+backup*.sql
+pg_dump*
+
+# Planilhas de corretora e extratos: dados financeiros reais nunca vão para o git.
+# Exceções só para arquivos fictícios: fixtures de teste e o template de importação.
+*.xlsx
+*.xls
+*.xlsm
+*.ods
+*.csv
+*.ofx
+*.pdf
+!backend/packages/*/tests/fixtures/**
+!reference/import-template/**
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node / front
+node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+
+# Cache de arquivos de mercado baixados (COTAHIST, CSV do Tesouro)
+.cache/
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+
+# Playwright e screenshots temporários (os do README ficam em docs/screenshots/)
+web/test-results/
+web/playwright-report/
+web/blob-report/
+*.tmp.png
+
+# Editor e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
