@@ -26,11 +26,13 @@ from cauri_api.schemas import (
     ImportPreviewOut,
     ImportRowOut,
     ImportSummaryOut,
+    ProfileIn,
+    ProfileOut,
 )
 from cauri_api.session import SessionDep
 from cauri_importers.service import MAX_FILES
 from cauri_importers.table import MAX_BYTES
-from cauri_ledger import Ledger, StoredBatch
+from cauri_ledger import ImportProfile, Ledger, StoredBatch
 
 router = APIRouter(prefix="/v1/imports", tags=["imports"])
 
@@ -54,8 +56,53 @@ async def upload(
         batch = _batch_out(ledger, result.batch) if result.batch else None
     return ImportPreviewOut(
         batch=batch,
-        problems=[FileProblemOut(index=p.index, message=p.message) for p in result.problems],
+        problems=[
+            FileProblemOut(index=p.index, message=p.message, columns=list(p.columns))
+            for p in result.problems
+        ],
         file_indexes=list(result.file_indexes),
+    )
+
+
+# Perfis (antes de /{batch_id}, para "profiles" não ser lido como id de lote) -----------
+
+
+@router.get("/profiles", response_model=list[ProfileOut])
+def list_profiles(session: SessionDep) -> list[ProfileOut]:
+    with session.member() as conn:
+        found = Ledger(conn).imports.profiles(session.user.id)
+    return [_profile_out(p) for p in found]
+
+
+@router.post("/profiles", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
+def save_profile(body: ProfileIn, session: SessionDep) -> ProfileOut:
+    options = body.options.model_dump(exclude_none=True)
+    with session.member() as conn:
+        ledger = Ledger(conn)
+        if body.options.broker_id and body.options.broker_id not in ledger.brokers():
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Corretora desconhecida.")
+        profile_id = ledger.imports.save_profile(
+            session.user.id, body.name, {str(k): v for k, v in body.mapping.items()}, options
+        )
+        saved = next(p for p in ledger.imports.profiles(session.user.id) if p.id == profile_id)
+    return _profile_out(saved)
+
+
+@router.delete("/profiles/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_profile(profile_id: UUID, session: SessionDep) -> None:
+    with session.member() as conn:
+        if not Ledger(conn).imports.delete_profile(session.user.id, profile_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Perfil não encontrado.")
+
+
+def _profile_out(p: ImportProfile) -> ProfileOut:
+    return ProfileOut(
+        id=p.id,
+        name=p.name,
+        mapping=dict(p.mapping),
+        options=dict(p.options),
+        created_at=p.created_at,
+        last_used_at=p.last_used_at,
     )
 
 
@@ -133,6 +180,13 @@ def _batch_out(ledger: Ledger, batch: StoredBatch) -> ImportBatchOut:
             amount=draft.get("amount"),
             factor=draft.get("factor"),
             income_kind=draft.get("income_kind"),
+            orig_currency=draft.get("orig_currency"),
+            orig_value=draft.get("orig_value"),
+            fx_rate=draft.get("fx_rate"),
+            fx_date=draft.get("fx_date"),
+            fx_source=draft.get("fx_source"),
+            fee_asset=draft.get("fee_asset"),
+            fee_quantity=draft.get("fee_quantity"),
         )
 
     return ImportBatchOut(

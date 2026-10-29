@@ -7,10 +7,10 @@ Números de dinheiro e quantidade trafegam como texto (``"1234.56"`` ou
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cauri_core import FiKind, IncomeKind, MovementType, Origin
 from cauri_ledger import DraftCheck, Issue
@@ -180,6 +180,14 @@ class ImportDraftOut(BaseModel):
     amount: str | None
     factor: str | None
     income_kind: IncomeKind | None
+    # Operação em outra moeda: valor original e a cotação usada na conversão.
+    orig_currency: str | None = None
+    orig_value: str | None = None
+    fx_rate: str | None = None
+    fx_date: date | None = None
+    fx_source: Literal["ptax", "fechamento"] | None = None
+    fee_asset: str | None = None
+    fee_quantity: str | None = None
 
 
 class ImportRowOut(BaseModel):
@@ -215,6 +223,8 @@ class ImportBatchOut(BaseModel):
 class FileProblemOut(BaseModel):
     index: int
     message: str
+    # Formato desconhecido: nomes das colunas do arquivo, para o mapeamento.
+    columns: list[str] = []
 
 
 class ImportPreviewOut(BaseModel):
@@ -243,3 +253,43 @@ class ImportCommitOut(BaseModel):
     replaced: int
     skipped: int
     snapshots_updated: bool = True
+
+
+ProfileField = Literal[
+    "data", "tipo", "ativo", "quantidade", "preco", "valor", "taxa", "ativo_taxa", "moeda",
+    "corretora", "obs",
+]  # fmt: skip
+ColumnName = Annotated[str, Field(min_length=1, max_length=80)]
+
+
+class ProfileOptionsIn(_In):
+    broker_id: str | None = Field(default=None, max_length=60)
+    decimal: Literal[",", "."] = ","
+    date_format: Literal["dd/mm/aaaa", "aaaa-mm-dd", "mm/dd/aaaa"] = "dd/mm/aaaa"
+    currency: str | None = Field(default=None, pattern=r"^[A-Z0-9]{2,12}$")
+
+
+class ProfileIn(_In):
+    name: str = Field(min_length=1, max_length=80)
+    mapping: dict[ProfileField, ColumnName]
+    options: ProfileOptionsIn = Field(default_factory=ProfileOptionsIn)
+
+    @model_validator(mode="after")
+    def _complete(self) -> ProfileIn:
+        missing = {"data", "tipo", "ativo"} - set(self.mapping)
+        if missing:
+            raise ValueError(f"Associe as colunas de: {', '.join(sorted(missing))}.")
+        if "corretora" not in self.mapping and not self.options.broker_id:
+            raise ValueError("Escolha a coluna da corretora ou uma corretora fixa.")
+        if "quantidade" not in self.mapping and "valor" not in self.mapping:
+            raise ValueError("Associe a coluna de quantidade ou a de valor.")
+        return self
+
+
+class ProfileOut(BaseModel):
+    id: UUID
+    name: str
+    mapping: dict[str, str]
+    options: dict[str, Any]
+    created_at: datetime
+    last_used_at: datetime | None

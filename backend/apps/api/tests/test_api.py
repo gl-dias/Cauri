@@ -320,3 +320,70 @@ class TestImportacao:
     def test_sem_login_nao_importa(self, client):
         res = client.post("/v1/imports", files=[("files", ("a.csv", IMPORT_CSV, "text/csv"))])
         assert res.status_code == 401
+
+
+UNKNOWN_CSV = ("Data Operação;Operação;Papel;Qtde;Preço\n05/01/2026;C;TSTA3;10;20,00\n").encode()
+PROFILE = {
+    "name": "Corretora Fictícia",
+    "mapping": {
+        "data": "Data Operação",
+        "tipo": "Operação",
+        "ativo": "Papel",
+        "quantidade": "Qtde",
+        "preco": "Preço",
+    },
+    "options": {"broker_id": "corretora-teste-a"},
+}
+
+
+class TestPerfisDeImportacao:
+    def test_desconhecido_vira_perfil_e_depois_e_reconhecido(self, client, make_user):
+        user = make_user()
+        first = upload(client, user, ("corretora.csv", UNKNOWN_CSV)).json()
+        assert first["batch"] is None
+        assert first["problems"][0]["columns"] == [
+            "Data Operação",
+            "Operação",
+            "Papel",
+            "Qtde",
+            "Preço",
+        ]
+
+        res = client.post("/v1/imports/profiles", json=PROFILE, headers=auth(user))
+        assert res.status_code == 201
+        profile = res.json()
+        assert profile["options"]["decimal"] == ","
+
+        second = upload(client, user, ("corretora.csv", UNKNOWN_CSV)).json()
+        assert second["batch"]["files"][0]["adapter"].startswith("perfil-")
+        assert second["batch"]["counts"] == {"ok": 1}
+
+        listed = client.get("/v1/imports/profiles", headers=auth(user)).json()
+        assert [p["name"] for p in listed] == ["Corretora Fictícia"]
+        assert listed[0]["last_used_at"] is not None
+
+        assert (
+            client.delete(f"/v1/imports/profiles/{profile['id']}", headers=auth(user)).status_code
+            == 204
+        )
+        assert client.get("/v1/imports/profiles", headers=auth(user)).json() == []
+
+    def test_perfil_incompleto_e_recusado(self, client, make_user):
+        user = make_user()
+        no_broker = {**PROFILE, "options": {}}
+        res = client.post("/v1/imports/profiles", json=no_broker, headers=auth(user))
+        assert res.status_code == 422
+        no_date = {**PROFILE, "mapping": {"tipo": "Operação", "ativo": "Papel"}}
+        assert (
+            client.post("/v1/imports/profiles", json=no_date, headers=auth(user)).status_code == 422
+        )
+        unknown_broker = {**PROFILE, "options": {"broker_id": "nao-existe"}}
+        res = client.post("/v1/imports/profiles", json=unknown_broker, headers=auth(user))
+        assert res.status_code == 422
+
+    def test_perfil_de_outro_usuario_nao_e_apagado(self, client, make_user):
+        ana, bruno = make_user(), make_user()
+        profile = client.post("/v1/imports/profiles", json=PROFILE, headers=auth(ana)).json()
+        res = client.delete(f"/v1/imports/profiles/{profile['id']}", headers=auth(bruno))
+        assert res.status_code == 404
+        assert len(client.get("/v1/imports/profiles", headers=auth(ana)).json()) == 1
