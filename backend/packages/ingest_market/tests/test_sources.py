@@ -132,7 +132,11 @@ def test_series_do_bcb_corretas():
     )
 
 
-SGS_HTML = "<html><body>The requested URL was rejected.</body></html>"
+SGS_HTML = (
+    '<?xml version="1.0" encoding="pt-br"?><html><head><title>Acesso negado</title>'
+    "<style>body { color: red }</style></head><body><p>The requested URL was rejected.</p>"
+    "</body></html>"
+)
 SGS_JSON = [{"data": "27/10/2026", "valor": "0.050788"}]
 
 
@@ -154,6 +158,11 @@ def _fetch_cdi(client: httpx.Client, waits: list[float]):
 
 
 class TestSgsInstavel:
+    @pytest.fixture(autouse=True)
+    def sem_intervalo(self, monkeypatch):
+        """O intervalo entre consultas tem teste próprio; aqui só contam as novas tentativas."""
+        monkeypatch.setattr(bcb_sgs, "MIN_INTERVAL_S", 0.0)
+
     def test_html_no_lugar_do_json_tenta_de_novo(self):
         client, requests = _sgs_client(
             httpx.Response(200, text=SGS_HTML, headers={"content-type": "text/html"}),
@@ -164,19 +173,23 @@ class TestSgsInstavel:
         points, raw = _fetch_cdi(client, waits)
         assert points == [(date(2026, 10, 27), Decimal("0.050788"))]
         assert len(requests) == 3
-        assert waits == list(bcb_sgs.RETRY_WAITS_S)
+        assert waits == list(bcb_sgs.RETRY_WAITS_S[:2])
         assert raw[0]["status"] == 200
 
     def test_desiste_mostrando_o_que_veio(self):
-        client, _ = _sgs_client(
-            *[httpx.Response(200, text=SGS_HTML, headers={"content-type": "text/html"})] * 3
+        attempts = len(bcb_sgs.RETRY_WAITS_S) + 1
+        client, requests = _sgs_client(
+            *[httpx.Response(200, text=SGS_HTML, headers={"content-type": "text/html"})] * attempts
         )
         with pytest.raises(bcb_sgs.SgsError) as erro:
             _fetch_cdi(client, [])
         message = str(erro.value)
+        assert len(requests) == 4
         assert "CDI (12) de 01/10/2026 a 28/10/2026" in message
         assert "respondeu 200 (text/html)" in message
+        assert "título Acesso negado" in message
         assert "The requested URL was rejected" in message
+        assert "color" not in message  # CSS da página não polui o erro
 
     def test_pedido_errado_nao_repete(self):
         client, requests = _sgs_client(httpx.Response(400, text="data inválida"))
@@ -201,6 +214,17 @@ class TestSgsInstavel:
                 }
             ],
         )
+
+
+def test_sgs_espera_o_intervalo_entre_consultas(monkeypatch):
+    clock = iter([100.0, 100.0, 101.0, 103.5])  # monotonic antes e depois de cada espera
+    monkeypatch.setattr(bcb_sgs.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(bcb_sgs, "_last_request", 0.0)
+    client, _ = _sgs_client(httpx.Response(200, json=SGS_JSON), httpx.Response(200, json=SGS_JSON))
+    waits: list[float] = []
+    _fetch_cdi(client, waits)  # primeira consulta: nada a esperar
+    _fetch_cdi(client, waits)  # 1 s depois: espera os 2 s que faltam
+    assert waits == [pytest.approx(bcb_sgs.MIN_INTERVAL_S - 1.0)]
 
 
 def test_coingecko_ponto_das_00h_utc_vira_fechamento_do_dia_anterior_em_brasilia():

@@ -6,13 +6,17 @@ em dólar e em stablecoins. Sai por volta das 13h dos dias úteis.
 Endpoint: https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados
 Séries diárias aceitam no máximo 10 anos por consulta; pedimos em janelas de 5.
 
-A API às vezes responde 200 com uma página HTML no lugar do JSON, ou 5xx. Cada janela tem
-três tentativas; se todas falharem, o erro diz o que veio (status, tipo e começo do corpo).
+A partir de IPs de datacenter (GitHub Actions), a API responde 200 com uma página HTML no
+lugar do JSON quando as consultas se acumulam: num run, o CDI passou de primeira e as séries
+seguintes falharam cada vez mais. Por isso há um intervalo mínimo entre consultas e esperas
+longas antes de tentar de novo. Se todas as tentativas falharem, o erro mostra o título e o
+texto da página que veio.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -26,9 +30,11 @@ from cauri_core.dates import SAO_PAULO, add_months
 from cauri_core.money import to_decimal
 
 URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{code}/dados"
-RETRY_WAITS_S = (3.0, 10.0)  # pausa antes da 2ª e da 3ª tentativa
+RETRY_WAITS_S = (20.0, 60.0, 120.0)  # pausa antes da 2ª, 3ª e 4ª tentativa
+MIN_INTERVAL_S = 3.0  # entre duas consultas quaisquer ao SGS, no mesmo processo
 
 log = logging.getLogger("cauri.ingest")
+_last_request = 0.0  # time.monotonic() da última consulta
 
 
 class SgsError(Exception):
@@ -98,6 +104,7 @@ def _window(
                 series.name, series.code, problem, RETRY_WAITS_S[attempt - 1],
             )  # fmt: skip
             sleep(RETRY_WAITS_S[attempt - 1])
+        _pace(sleep)
         try:
             response = client.get(URL.format(code=series.code), params=params, timeout=60)
         except httpx.TransportError as exc:
@@ -118,6 +125,15 @@ def _window(
     )
 
 
+def _pace(sleep: Callable[[float], None]) -> None:
+    """Espera o que faltar para MIN_INTERVAL_S desde a última consulta."""
+    global _last_request
+    wait = _last_request + MIN_INTERVAL_S - time.monotonic()
+    if wait > 0:
+        sleep(wait)
+    _last_request = time.monotonic()
+
+
 def _list(response: httpx.Response) -> list[dict[str, Any]] | None:
     try:
         payload = response.json()
@@ -128,5 +144,11 @@ def _list(response: httpx.Response) -> list[dict[str, Any]] | None:
 
 def _describe(response: httpx.Response) -> str:
     kind = response.headers.get("content-type", "sem content-type")
-    start = " ".join(response.text[:160].split())
-    return f"respondeu {response.status_code} ({kind}) sem a lista de pontos: {start!r}"
+    text = response.text
+    if "html" in kind.lower() or text.lstrip().startswith("<"):
+        title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+        body = re.sub(r"<(script|style)\b.*?</\1>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        body = re.sub(r"<[^>]+>", " ", body)
+        text = f"título {' '.join(title.group(1).split()) if title else '(sem título)'}; {body}"
+    summary = " ".join(text.split())[:240]
+    return f"respondeu {response.status_code} ({kind}) sem a lista de pontos: {summary!r}"
