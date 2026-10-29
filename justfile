@@ -35,6 +35,11 @@ lint:
     cd backend && uv run mypy {{packages}}
     cd backend && uv run lint-imports
 
+# Workflows do GitHub Actions e segredos, antes de qualquer push (via Docker)
+pre-push:
+    docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -no-color
+    docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --config /repo/.gitleaks.toml --redact --exit-code 1
+
 # Testes Python (os marcados com `db` precisam do Supabase local no ar)
 test *args:
     cd backend && uv run pytest {{args}}

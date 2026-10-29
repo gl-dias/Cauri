@@ -132,8 +132,6 @@ jobs:
     defaults:
       run:
         working-directory: web
-    env:
-      CAURI_SHOTS_DIR: ${{ runner.temp }}/interface
     steps:
       - uses: actions/checkout@v7
 
@@ -150,6 +148,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Contraste e layout
+        env:
+          CAURI_SHOTS_DIR: ${{ runner.temp }}/interface
         run: npx playwright test
 
       - name: Relatórios (quando falha)
