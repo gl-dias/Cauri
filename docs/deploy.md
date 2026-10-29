@@ -33,12 +33,19 @@ Nginx recebe o subdomínio por `sed` na instalação.
 ## 1. Supabase (região São Paulo)
 
 1. Crie o projeto em **South America (São Paulo), sa-east-1**. Guarde a senha do banco num
-   gerenciador de senhas; ela compõe o `SUPABASE_DB_URL`.
-2. **Data API** (Settings, API): em *Exposed schemas* deixe só `marts`. O pg_graphql é
-   removido pela primeira migration.
-3. **Migrations:** cadastre o secret `SUPABASE_DB_URL` (seção 5) e rode o workflow
+   gerenciador de senhas; ela compõe o `SUPABASE_DB_URL`. Use só letras e números: a senha
+   vai dentro de uma URL, onde `@ : / # ?` quebram a conexão. Esqueceu ou não guardou?
+   *Project Settings, Database, Reset database password*.
+2. **Migrations:** cadastre o secret `SUPABASE_DB_URL` (seção 5) e rode o workflow
    *Migrations em produção* (Actions, Run workflow). Depois disso ele roda sozinho a cada
-   migration nova na `main`.
+   migration nova na `main`. O URI pronto, só faltando a senha, está no botão *Connect*,
+   *Session pooler*: `postgresql://postgres.<ref>:[YOUR-PASSWORD]@<host-do-pooler>:5432/postgres`.
+3. **Data API** (*Integrations, Data API, Settings*), **depois** das migrations, porque é
+   a primeira que cria o schema `marts`:
+   - *Exposed schemas*: só `marts` (desmarque `public` e `graphql_public`);
+   - *Automatically expose new tables*: desligado. As migrations dão as permissões
+     explicitamente, view por view.
+   O pg_graphql é removido pela primeira migration.
 4. **Senhas dos roles da aplicação** (SQL Editor), uma vez:
 
    ```sql
@@ -99,6 +106,9 @@ Passo a passo com os comandos em `deploy/vps/README.md`:
 ## 4. Cloudflare Pages
 
 1. Conecte o repositório (privado funciona). Projeto `cauri`, branch de produção `main`.
+   Para usar o domínio raiz (`seu-dominio.com.br`, sem subdomínio) no Pages, o DNS do
+   domínio precisa estar no Cloudflare: adicione o domínio no painel (plano Free) e troque
+   os servidores DNS no registro.br pelos dois que o Cloudflare indicar.
 2. Build: diretório raiz `web`, comando `npm ci && npm run build`, saída `dist`.
 3. Variáveis de ambiente de produção (não são segredos: vão para o navegador):
    - `VITE_SUPABASE_URL=https://<ref>.supabase.co`
@@ -143,7 +153,7 @@ As chaves da Anthropic e da Groq não vão para o GitHub: só existem no `api.en
 
 ## 6. Ordem e checkpoint
 
-1. Supabase (1.1 a 1.4) e o workflow *Migrations em produção*.
+1. Supabase (1.1 a 1.4, com as migrations no 1.2).
 2. Resend e SMTP do Supabase (1.5 a 1.9, 2).
 3. Workflow *Preparar produção* (Run workflow, "tudo"): cadastro, ativos, carteira demo,
    admin (`ADMIN_EMAIL`) e histórico de preços.
