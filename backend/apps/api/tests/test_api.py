@@ -229,3 +229,94 @@ class TestAdmin:
             ).status_code
             == 422
         )
+
+
+IMPORT_CSV = (
+    b"data;tipo;ativo;classe;quantidade;preco;valor;corretora\n"
+    b"05/01/2026;compra;TSTA3;acao;10;20,00;;Corretora Teste A\n"
+    b"15/01/2026;provento;TSTF11;fii;;;3,21;corretora-teste-b\n"
+    b"16/01/2026;compra;NAOEXISTE3;acao;1;1,00;;Corretora Teste A\n"
+)
+
+
+def upload(client, user, *files):
+    return client.post(
+        "/v1/imports",
+        files=[("files", (name, content, "text/csv")) for name, content in files],
+        headers=auth(user),
+    )
+
+
+class TestImportacao:
+    def test_previa_depois_gravacao_e_historico(self, client, make_user):
+        user = make_user()
+        res = upload(client, user, ("minha planilha.csv", IMPORT_CSV))
+        assert res.status_code == 201
+        body = res.json()
+        batch = body["batch"]
+        assert body["problems"] == []
+        assert batch["status"] == "preview"
+        assert batch["counts"] == {"ok": 2, "error": 1}
+        ok, income, bad = batch["files"][0]["rows"]
+        assert ok["draft"]["broker_name"] == "Corretora Teste A"
+        assert ok["draft"]["quantity"] == "10"
+        assert income["draft"]["income_kind"] == "rendimento"
+        assert bad["status"] == "error"
+        assert "NAOEXISTE3" in bad["messages"][0]["text"]
+        # O nome do arquivo não é guardado: o lote tem um rótulo gerado.
+        assert batch["files"][0]["label"].startswith("Template do Cauri")
+
+        res = client.post(f"/v1/imports/{batch['id']}/commit", json={}, headers=auth(user))
+        assert res.status_code == 200
+        assert res.json()["created"] == 2
+
+        again = client.get(f"/v1/imports/{batch['id']}", headers=auth(user)).json()
+        assert again["status"] == "committed"
+        assert again["files"][0]["rows"][0]["movement_id"]
+        history = client.get("/v1/imports", headers=auth(user)).json()
+        assert history[0]["id"] == batch["id"]
+        assert history[0]["imported"] == 2
+
+        res = client.post(f"/v1/imports/{batch['id']}/commit", json={}, headers=auth(user))
+        assert res.status_code == 409
+
+    def test_lote_de_outro_usuario_e_404(self, client, make_user):
+        ana, bruno = make_user(), make_user()
+        batch = upload(client, ana, ("a.csv", IMPORT_CSV)).json()["batch"]
+        assert client.get(f"/v1/imports/{batch['id']}", headers=auth(bruno)).status_code == 404
+        res = client.post(f"/v1/imports/{batch['id']}/commit", json={}, headers=auth(bruno))
+        assert res.status_code == 404
+
+    def test_arquivo_ilegivel_volta_como_problema_sem_lote(self, client, make_user):
+        res = upload(client, make_user(), ("extrato.pdf", b"%PDF-1.7"))
+        assert res.status_code == 201
+        assert res.json()["batch"] is None
+        assert "Formato não suportado" in res.json()["problems"][0]["message"]
+
+    def test_arquivo_grande_demais_e_recusado(self, client, make_user):
+        big = b"data;tipo\n" + b"x" * (5 * 1024 * 1024 + 10)
+        res = upload(client, make_user(), ("grande.csv", big))
+        assert "5 MB" in res.json()["problems"][0]["message"]
+
+    def test_decisao_desconhecida_e_422(self, client, make_user):
+        user = make_user()
+        batch = upload(client, user, ("a.csv", IMPORT_CSV)).json()["batch"]
+        row_id = batch["files"][0]["rows"][0]["id"]
+        res = client.post(
+            f"/v1/imports/{batch['id']}/commit",
+            json={"decisions": {row_id: "apagar"}},
+            headers=auth(user),
+        )
+        assert res.status_code == 422
+
+    def test_descartar(self, client, make_user):
+        user = make_user()
+        batch = upload(client, user, ("a.csv", IMPORT_CSV)).json()["batch"]
+        assert (
+            client.post(f"/v1/imports/{batch['id']}/discard", headers=auth(user)).status_code == 204
+        )
+        assert client.get("/v1/imports", headers=auth(user)).json() == []
+
+    def test_sem_login_nao_importa(self, client):
+        res = client.post("/v1/imports", files=[("files", ("a.csv", IMPORT_CSV, "text/csv"))])
+        assert res.status_code == 401

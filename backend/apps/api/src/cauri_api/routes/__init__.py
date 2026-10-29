@@ -1,3 +1,3 @@
-from cauri_api.routes import account, movements
+from cauri_api.routes import account, imports, movements
 
-__all__ = ["account", "movements"]
+__all__ = ["account", "imports", "movements"]

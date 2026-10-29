@@ -151,3 +151,95 @@ class AllowlistEntryOut(BaseModel):
     role: Literal["admin", "user"]
     note: str | None
     added_at: datetime
+
+
+# Importação -------------------------------------------------------------------------
+
+ImportDecision = Literal["import", "keep_existing", "replace", "import_new"]
+RowStatusOut = Literal["ok", "error", "already_imported", "possible_duplicate", "ignored"]
+BatchStatusOut = Literal["preview", "committed", "discarded"]
+
+
+class ImportMessageOut(BaseModel):
+    level: Literal["error", "warning", "info"]
+    text: str
+
+
+class ImportDraftOut(BaseModel):
+    """O que a linha vai virar no ledger, já resolvido (números como texto)."""
+
+    trade_date: date
+    type: MovementType
+    ticker: str | None
+    asset_label: str
+    broker_id: str
+    broker_name: str
+    quantity: str | None
+    unit_price: str | None
+    fees: str | None
+    amount: str | None
+    factor: str | None
+    income_kind: IncomeKind | None
+
+
+class ImportRowOut(BaseModel):
+    id: UUID
+    line_numbers: list[int]
+    status: RowStatusOut
+    decision: ImportDecision | None
+    messages: list[ImportMessageOut]
+    raw: dict[str, str]
+    draft: ImportDraftOut | None
+    match_movement_ids: list[UUID]
+    movement_id: UUID | None
+
+
+class ImportFileOut(BaseModel):
+    id: UUID
+    label: str
+    adapter: str
+    rows: list[ImportRowOut]
+    counts: dict[str, int]
+
+
+class ImportBatchOut(BaseModel):
+    id: UUID
+    status: BatchStatusOut
+    created_at: datetime
+    finished_at: datetime | None
+    warnings: list[str]
+    files: list[ImportFileOut]
+    counts: dict[str, int]
+
+
+class FileProblemOut(BaseModel):
+    index: int
+    message: str
+
+
+class ImportPreviewOut(BaseModel):
+    batch: ImportBatchOut | None
+    problems: list[FileProblemOut]
+    # Posição no envio de cada arquivo do lote, para a tela ligar ao nome que ela conhece.
+    file_indexes: list[int]
+
+
+class ImportSummaryOut(BaseModel):
+    id: UUID
+    status: BatchStatusOut
+    created_at: datetime
+    finished_at: datetime | None
+    labels: list[str]
+    imported: int
+
+
+class ImportCommitIn(_In):
+    decisions: dict[UUID, ImportDecision] = Field(default_factory=dict, max_length=20_000)
+
+
+class ImportCommitOut(BaseModel):
+    created: int
+    already_imported: int
+    replaced: int
+    skipped: int
+    snapshots_updated: bool = True

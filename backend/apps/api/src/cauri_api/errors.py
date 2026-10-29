@@ -8,6 +8,7 @@ import psycopg
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
+import cauri_importers as importers
 from cauri_api.schemas import DraftCheckOut, IssueOut
 from cauri_ledger import (
     LedgerValidationError,
@@ -45,6 +46,19 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(MovementNotFoundError)
     async def _not_found(_: Request, exc: MovementNotFoundError) -> JSONResponse:
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+
+    @app.exception_handler(importers.ImportRejectedError)
+    async def _import(_: Request, exc: importers.ImportRejectedError) -> JSONResponse:
+        if isinstance(exc, importers.BatchNotFoundError):
+            code = status.HTTP_404_NOT_FOUND
+        elif isinstance(exc, importers.BatchClosedError | importers.CommitRejectedError):
+            code = status.HTTP_409_CONFLICT
+        else:
+            code = status.HTTP_422_UNPROCESSABLE_CONTENT
+        content: dict[str, object] = {"detail": str(exc)}
+        if isinstance(exc, importers.CommitRejectedError):
+            content["messages"] = exc.messages
+        return JSONResponse(status_code=code, content=content)
 
     @app.exception_handler(FormError)
     async def _form(_: Request, exc: FormError) -> JSONResponse:

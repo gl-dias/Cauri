@@ -35,6 +35,7 @@ def create_app(settings: Settings | None = None, *, pool: Pool | None = None) ->
     )
     errors.install(app)
     app.include_router(routes.movements.router)
+    app.include_router(routes.imports.router)
     app.include_router(routes.account.router)
 
     @app.get("/health", tags=["ops"])

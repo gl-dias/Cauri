@@ -9,7 +9,9 @@ dependencies = [
   "cauri-engine",
   "cauri-ledger",
   "cauri-manual-entry",
+  "cauri-importers",
   "fastapi>=0.120",
+  "python-multipart>=0.0.20",
   "uvicorn[standard]>=0.38",
   "pyjwt[crypto]>=2.10",
   "pydantic-settings>=2.11",
@@ -21,6 +23,7 @@ cauri-storage = { workspace = true }
 cauri-engine = { workspace = true }
 cauri-ledger = { workspace = true }
 cauri-manual-entry = { workspace = true }
+cauri-importers = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.9,<0.14"]
