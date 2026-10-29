@@ -127,3 +127,22 @@ export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
 export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-white/10 ${className}`} />;
 }
+
+/** Sigla do ativo num círculo na cor da classe (cor clareada sobre fundo escuro: passa no AA). */
+export function AssetAvatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="grid shrink-0 place-items-center rounded-full font-bold tracking-tight"
+      style={{
+        width: size,
+        height: size,
+        fontSize: initials.length > 3 ? 10.5 : 11.5,
+        background: `color-mix(in srgb, ${color} 28%, rgba(0, 0, 0, 0.55))`,
+        color: `color-mix(in srgb, ${color} 55%, white)`,
+      }}
+    >
+      {initials}
+    </span>
+  );
+}

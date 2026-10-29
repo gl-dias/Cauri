@@ -104,9 +104,9 @@ export function DeltaBadge({ value, children, tone }: { value?: number; children
   // Fundo escuro por baixo da tinta: o selo continua verde/vermelho e o texto passa no AA
   // mesmo quando o card está sobre a parte clara da foto.
   const styles = {
-    gain: "text-gain [background:color-mix(in_srgb,var(--cauri-gain)_16%,rgba(0,0,0,0.45))]",
-    loss: "text-loss [background:color-mix(in_srgb,var(--cauri-loss)_16%,rgba(0,0,0,0.45))]",
-    neutral: "text-muted bg-black/30",
+    gain: "text-gain [background:color-mix(in_srgb,var(--cauri-gain)_16%,rgba(0,0,0,0.74))]",
+    loss: "text-loss [background:color-mix(in_srgb,var(--cauri-loss)_16%,rgba(0,0,0,0.74))]",
+    neutral: "text-muted bg-black/40",
   }[resolved];
   return (
     <span data-num className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ${styles}`}>

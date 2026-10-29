@@ -1,6 +1,18 @@
-import { Bell, House, LayoutGrid, ListOrdered, MessageCircle, Search, Upload, Wallet, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  House,
+  LayoutGrid,
+  ListOrdered,
+  LogOut,
+  MessageCircle,
+  Search,
+  ShieldCheck,
+  Upload,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink } from "react-router";
 
 import { BACKGROUNDS, type BackgroundSlug } from "@/theme/backgrounds";
@@ -12,14 +24,17 @@ import { Avatar } from "./viz";
 
 export type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
-export function navItems(base: string): NavItem[] {
-  return [
+export function navItems(base: string, { admin = false }: { admin?: boolean } = {}): NavItem[] {
+  const items: NavItem[] = [
     { to: base, label: "Início", icon: House, end: true },
     { to: `${base}/carteira`, label: "Carteira", icon: Wallet },
     { to: `${base}/lancamentos`, label: "Lançamentos", icon: ListOrdered },
     { to: `${base}/importar`, label: "Importar", icon: Upload },
     { to: `${base}/assistente`, label: "Assistente", icon: MessageCircle },
   ];
+  // A tela de admin só aparece para admin (e a API e o RLS recusam os outros de qualquer jeito).
+  if (admin) items.push({ to: `${base}/admin`, label: "Admin", icon: ShieldCheck });
+  return items;
 }
 
 function Logo({ demo }: { demo: boolean }) {
@@ -78,7 +93,52 @@ function NavPills({ items }: { items: NavItem[] }) {
   );
 }
 
-export function TopBar({ items, name, demo, notifications = 0 }: { items: NavItem[]; name: string; demo: boolean; notifications?: number }) {
+function AccountMenu({ name, onSignOut }: { name: string; onSignOut?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  if (!onSignOut) return <Avatar name={name} />;
+  return (
+    <div ref={box} className="relative">
+      <button type="button" aria-label="Conta" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="rounded-full">
+        <Avatar name={name} />
+      </button>
+      {open ? (
+        <div className="absolute top-14 right-0 w-56 rounded-[16px] border border-white/15 bg-[rgba(28,22,18,0.94)] p-1.5 shadow-lifted">
+          <div className="truncate px-3 py-2 text-[13px] text-muted">{name}</div>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-[14px] hover:bg-white/10"
+          >
+            <LogOut className="size-4" /> Sair
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function TopBar({
+  items,
+  name,
+  demo,
+  notifications = 0,
+  onSignOut,
+}: {
+  items: NavItem[];
+  name: string;
+  demo: boolean;
+  notifications?: number;
+  onSignOut?: () => void;
+}) {
   return (
     <header className="fixed inset-x-0 top-0 z-30 px-4 pt-4 sm:px-6 sm:pt-5">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
@@ -96,7 +156,7 @@ export function TopBar({ items, name, demo, notifications = 0 }: { items: NavIte
           <IconButton label="Notificações" badge={notifications}>
             <Bell className="size-[18px]" strokeWidth={1.9} />
           </IconButton>
-          <Avatar name={name} />
+          <AccountMenu name={name} onSignOut={onSignOut} />
         </div>
       </div>
     </header>
@@ -149,13 +209,27 @@ function Footer({ slug }: { slug: BackgroundSlug }) {
   );
 }
 
-export function AppShell({ base, name, demo, children }: { base: string; name: string; demo: boolean; children: ReactNode }) {
-  const items = navItems(base);
+export function AppShell({
+  base,
+  name,
+  demo,
+  admin = false,
+  onSignOut,
+  children,
+}: {
+  base: string;
+  name: string;
+  demo: boolean;
+  admin?: boolean;
+  onSignOut?: () => void;
+  children: ReactNode;
+}) {
+  const items = navItems(base, { admin });
   const slug = tokens.background.photo;
   return (
     <>
       <Background slug={slug} />
-      <TopBar items={items} name={name} demo={demo} />
+      <TopBar items={items} name={name} demo={demo} onSignOut={onSignOut} />
       <Dock items={items} />
       <main className="mx-auto max-w-[1600px] px-4 pt-24 pb-28 sm:px-6 sm:pt-28 md:pr-8 md:pb-10 md:pl-[104px]">
         {children}

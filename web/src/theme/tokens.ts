@@ -17,12 +17,12 @@ export const tokens = {
   color: {
     text: "#ffffff",
     textMuted: "rgba(255, 255, 255, 0.78)",
-    textSubtle: "rgba(255, 255, 255, 0.70)",
+    textSubtle: "rgba(255, 255, 255, 0.72)",
     gain: "#34d399", // emerald-400
     loss: "#fb7185", // rose-400
     accent: "#60a5fa", // blue-400: destaque
-    primary: "#3b82f6", // blue-500: ação primária
-    primaryHover: "#2563eb",
+    primary: "#2563eb", // blue-600: ação primária (branco sobre blue-500 não passa no AA)
+    primaryHover: "#1d4ed8",
     gold: "#f9d47e",
     avatarFrom: "#fdba74",
     avatarTo: "#f97316",

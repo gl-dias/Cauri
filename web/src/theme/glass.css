@@ -90,9 +90,10 @@
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--cauri-glass-saturate));
   }
 
-  /* Dentro de um card de vidro não se empilha outro blur (desempenho no celular). */
+  /* Dentro de um card de vidro não se empilha outro blur (desempenho no celular). O poço é
+     levemente mais escuro que o card: o texto secundário continua passando no AA. */
   .glass-inset {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.24);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--cauri-radius-inner);
   }
