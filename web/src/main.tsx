@@ -4,33 +4,55 @@ import "./theme/glass.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from "react-router";
 
+import { AuthProvider } from "./auth/AuthProvider";
+import { AppLayout } from "./routes/AppLayout";
 import { ComingSoon } from "./routes/ComingSoon";
 import { DemoLayout } from "./routes/DemoLayout";
+import { LoginPage } from "./routes/LoginPage";
 import { applyTheme } from "./theme/tokens";
 
 applyTheme();
 
 // Telas carregadas sob demanda: o gráfico (Recharts) só baixa quando a tela que usa abre.
 const HomePage = lazy(() => import("./features/home/HomePage").then((m) => ({ default: m.HomePage })));
+const PortfolioPage = lazy(() => import("./features/portfolio/PortfolioPage").then((m) => ({ default: m.PortfolioPage })));
+const LedgerPage = lazy(() => import("./features/ledger/LedgerPage").then((m) => ({ default: m.LedgerPage })));
+const AdminPage = lazy(() => import("./features/admin/AdminPage").then((m) => ({ default: m.AdminPage })));
 const page = (node: React.ReactNode) => <Suspense fallback={null}>{node}</Suspense>;
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5 * 60_000, refetchOnWindowFocus: false, retry: 1 } },
 });
 
+
+const appScreens = [
+  { index: true, element: page(<HomePage />) },
+  { path: "carteira", element: page(<PortfolioPage />) },
+  { path: "lancamentos", element: page(<LedgerPage />) },
+  { path: "importar", element: <ComingSoon title="Importar" phase="Fase 4" /> },
+  { path: "assistente", element: <ComingSoon title="Assistente" phase="Fase 5" /> },
+];
+
 const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/demo" replace /> },
+  { path: "/demo", element: <DemoLayout />, children: appScreens },
+  // Login e /app dividem um único AuthProvider (um só cliente de sessão). O /demo fica
+  // fora dele: não lê nem cria sessão.
   {
-    path: "/demo",
-    element: <DemoLayout />,
+    element: (
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    ),
     children: [
-      { index: true, element: page(<HomePage />) },
-      { path: "carteira", element: <ComingSoon title="Carteira" /> },
-      { path: "lancamentos", element: <ComingSoon title="Lançamentos" /> },
-      { path: "importar", element: <ComingSoon title="Importar" /> },
-      { path: "assistente", element: <ComingSoon title="Assistente" /> },
+      { path: "/login", element: <LoginPage /> },
+      {
+        path: "/app",
+        element: <AppLayout />,
+        children: [...appScreens, { path: "admin", element: page(<AdminPage />) }],
+      },
     ],
   },
   { path: "*", element: <Navigate to="/demo" replace /> },
