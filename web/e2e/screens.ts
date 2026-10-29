@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
+import { SAMPLE_FILENAMES } from "../src/features/import/sample";
 import { mockApp, mockDemo, mockLogin } from "./mocks";
 
 export type Screen = {
@@ -46,6 +47,21 @@ export const SCREENS: Screen[] = [
     },
   },
   { name: "app-admin", path: "/app/admin", ready: "Convidados", setup: (page) => mockApp(page) },
+  { name: "demo-importar", path: "/demo/importar", ready: "Exemplo de pré-visualização", setup: mockDemo },
+  { name: "app-importar", path: "/app/importar", ready: "Arraste os arquivos aqui", setup: (page) => mockApp(page) },
+  {
+    name: "app-importar-previa",
+    path: "/app/importar",
+    ready: "Arraste os arquivos aqui",
+    setup: (page) => mockApp(page),
+    after: async (page) => {
+      await page.getByLabel("Escolher arquivos").setInputFiles(
+        SAMPLE_FILENAMES.map((name) => ({ name, mimeType: "application/octet-stream", buffer: Buffer.from("fictício") })),
+      );
+      await page.getByRole("button", { name: "Pré-visualizar" }).click();
+      await expect(page.getByRole("button", { name: "Importar 5" })).toBeVisible();
+    },
+  },
 ];
 
 export async function openScreen(page: Page, screen: Screen): Promise<void> {

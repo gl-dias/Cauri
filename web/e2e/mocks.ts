@@ -8,6 +8,8 @@ import path from "node:path";
 
 import type { Page, Route } from "@playwright/test";
 
+import { SAMPLE_BATCH } from "../src/features/import/sample";
+
 export const LIVE = process.env.CAURI_E2E_LIVE === "1";
 
 type Row = Record<string, unknown>;
@@ -137,6 +139,10 @@ const JOB_SOURCES = [
   ...["cotahist", "tesouro", "coingecko", "bcb_sgs", "calendar"].map((source) => ({ run_id: "r1", source, status: "ok", requested: 1, succeeded: 1, failed: 0, error_sample: null, duration_ms: 5000 })),
 ];
 
+const RECENT_IMPORTS = [
+  { id: "r-imp-1", status: "committed", created_at: "2026-10-20T21:10:00Z", finished_at: "2026-10-20T21:11:00Z", labels: ["Template do Cauri, 01/2026 a 09/2026"], imported: 42 },
+];
+
 /** /app: sessão de uma convidada fictícia (admin), carteira = fixtures do demo, API simulada. */
 export async function mockApp(page: Page, { role = "admin" as "admin" | "user" } = {}): Promise<void> {
   if (LIVE) return;
@@ -173,6 +179,13 @@ export async function mockApp(page: Page, { role = "admin" as "admin" | "user" }
     const req = route.request();
     const path = new URL(req.url()).pathname;
     if (path.endsWith("/admin/allowlist") && req.method() === "GET") return route.fulfill({ json: ALLOWLIST });
+    if (path.endsWith("/v1/imports") && req.method() === "GET") return route.fulfill({ json: RECENT_IMPORTS });
+    if (path.endsWith("/v1/imports") && req.method() === "POST") {
+      return route.fulfill({ status: 201, json: { batch: SAMPLE_BATCH, problems: [], file_indexes: [0, 1] } });
+    }
+    if (path.endsWith("/commit")) {
+      return route.fulfill({ json: { created: 5, already_imported: 0, replaced: 0, skipped: 1, snapshots_updated: true } });
+    }
     if (path.endsWith("/movements/check")) {
       return route.fulfill({ json: { ok: true, checks: [{ index: 0, ok: true, errors: [], duplicates: [], already_posted: null }] } });
     }

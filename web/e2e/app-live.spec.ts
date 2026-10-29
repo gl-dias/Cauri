@@ -76,6 +76,35 @@ test.describe("ao vivo", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test("importa uma planilha pela tela e o reenvio não duplica", async ({ page }) => {
+    const since = Date.now() - 1000;
+    await requestLink(page, ADMIN);
+    await page.goto(await magicLink(ADMIN, since));
+    await expect(page).toHaveURL(/\/app/);
+
+    // Preço único por execução: cada rodada é uma operação nova para o ledger.
+    const price = (30 + (Date.now() % 1000) / 100).toFixed(2).replace(".", ",");
+    const csv = Buffer.from(
+      `data;tipo;ativo;classe;quantidade;preco;corretora\n02/03/2026;compra;PETR4;acao;1;${price};XP Investimentos\n`,
+    );
+    const pick = async () => {
+      await page.goto("/app/importar");
+      await page.getByLabel("Escolher arquivos").setInputFiles({ name: "teste-e2e.csv", mimeType: "text/csv", buffer: csv });
+      await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    };
+
+    await pick();
+    await expect(page.getByText("pronta").first()).toBeVisible();
+    await page.getByRole("button", { name: "Importar 1" }).click();
+    await expect(page.getByText("1 movimentação importada")).toBeVisible();
+
+    await pick();
+    await expect(page.getByText("já importada").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Importar 0" })).toBeDisabled();
+    await page.getByRole("button", { name: "Descartar" }).click();
+    await expect(page.getByText("Arraste os arquivos aqui")).toBeVisible();
+  });
+
   test("e-mail fora da allowlist vê a mesma mensagem e não recebe link", async ({ page }) => {
     const outsider = `nao-convidado-${Date.now()}@example.test`;
     const since = Date.now() - 1000;
