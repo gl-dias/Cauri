@@ -13,7 +13,6 @@ import {
   type ImportProfile,
   type ImportRow,
   type ImportRowStatus,
-  type OpeningSuggestion,
   type ProfileField,
   type ProfileOptions,
 } from "@/data/api";
@@ -26,6 +25,8 @@ import { Dialog } from "@/ui/Dialog";
 import { Field, FilterPills, SelectInput, TextInput } from "@/ui/forms";
 import { CardHeader, GlassCard } from "@/ui/GlassCard";
 import { pageVariants, staticVariants } from "@/ui/motion";
+
+import { OpeningSuggestionCard } from "@/features/shared/OpeningSuggestionCard";
 
 import { countToImport, initialDecisions } from "./decisions";
 import { FIELDS, guessMapping, missingForProfile } from "./mapping";
@@ -198,12 +199,14 @@ function ImportFlow({ app }: { app: AppSource }) {
         {batch ? (
           <>
             {batch.suggestions?.map((s) => (
-              <SuggestionCard
+              <OpeningSuggestionCard
                 key={`${s.ticker}-${s.first_shortfall}`}
-                app={app}
-                batchId={batch.id}
                 suggestion={s}
-                onUpdated={(updated) => setStage({ ...stage, preview: { ...preview, batch: updated } })}
+                onSubmit={async (body) => {
+                  const updated = await app.api.imports.addOpening(batch.id, body);
+                  setStage({ ...stage, preview: { ...preview, batch: updated } });
+                }}
+                note="O saldo inicial entra junto com o resto da importação, só quando você confirmar."
               />
             ))}
             <PreviewView batch={batch} filenames={filenames} decisions={decisions} onDecision={(id, d) => setDecisions((s) => ({ ...s, [id]: d }))} />
@@ -283,62 +286,6 @@ function ImportFlow({ app }: { app: AppSource }) {
         </GlassCard>
       </div>
     </div>
-  );
-}
-
-/* Saldo que falta: venda descoberta vira oferta de saldo inicial ---------------------- */
-
-const toBR = (value: string) => value.replace(".", ",");
-
-function SuggestionCard({ app, batchId, suggestion: s, onUpdated }: {
-  app: AppSource;
-  batchId: string;
-  suggestion: OpeningSuggestion;
-  onUpdated: (batch: ImportBatch) => void;
-}) {
-  const [tradeDate, setTradeDate] = useState(s.trade_date);
-  const [quantity, setQuantity] = useState(toBR(s.quantity));
-  const [cost, setCost] = useState(s.unit_cost ? toBR(s.unit_cost) : "");
-  const add = useMutation({
-    mutationFn: () =>
-      app.api.imports.addOpening(batchId, { ticker: s.ticker, trade_date: tradeDate, quantity, unit_cost: cost, broker_id: s.broker_id }),
-    onSuccess: onUpdated,
-  });
-  const id = (key: string) => `saldo-${s.ticker}-${key}`;
-  const suggested = s.unit_cost !== null && cost === toBR(s.unit_cost);
-  return (
-    <GlassCard lift={false} className="space-y-4">
-      <CardHeader
-        title={`Falta saldo de ${s.ticker}`}
-        subtitle={`As vendas a partir de ${formatDate(s.first_shortfall)} ficam descobertas: falta saldo de ${s.ticker} que veio de antes do arquivo.`}
-      />
-      {s.deposit ? (
-        <p className="text-[14px] text-gold">
-          Um depósito de {toBR(s.deposit.quantity)} {s.ticker} em {formatDate(s.deposit.day)} explica esse saldo: ele veio de fora. Informe o
-          custo médio de quando você comprou.
-        </p>
-      ) : null}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label="Data do saldo" htmlFor={id("data")}>
-          <TextInput id={id("data")} type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} />
-        </Field>
-        <Field label="Quantidade" htmlFor={id("qtd")}>
-          <TextInput id={id("qtd")} inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-        </Field>
-        <Field label="Custo médio (R$)" htmlFor={id("custo")} hint={suggested && s.cost_note ? s.cost_note : "o que você pagou, em média"}>
-          <TextInput id={id("custo")} inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0,00" />
-        </Field>
-      </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[13px] text-muted">O saldo inicial entra junto com o resto da importação, só quando você confirmar.</p>
-        <PrimaryButton disabled={!cost || !quantity || add.isPending} onClick={() => add.mutate()} className="disabled:cursor-not-allowed disabled:opacity-60">
-          {add.isPending ? "Conferindo..." : "Incluir saldo inicial e conferir de novo"}
-        </PrimaryButton>
-      </div>
-      {add.error ? (
-        <p role="alert" className="text-[13px] text-loss">{add.error instanceof ApiError ? add.error.message : "Sem conexão com a API."}</p>
-      ) : null}
-    </GlassCard>
   );
 }
 

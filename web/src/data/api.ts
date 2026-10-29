@@ -99,6 +99,42 @@ export type OpeningSuggestion = {
   cost_note: string | null;
   deposit: { quantity: string; day: string } | null;
 };
+export type AssistantConfig = { llm: "anthropic" | "regras" | "indisponivel"; model: string | null; voice: "groq" | "navegador" };
+export type ProposalItemStatus = "ok" | "erro" | "pergunta" | "duplicado" | "gravado";
+export type ProposalItem = {
+  id: string;
+  kind: "operacao" | "contrapartida" | "saldo_inicial";
+  parent?: string;
+  status: ProposalItemStatus;
+  ticker: string | null;
+  asset_name: string | null;
+  broker_name?: string;
+  question: { field: "ticker" | "broker_id"; text: string; options: string[] } | null;
+  price_suggested: { value: string; date: string } | null;
+  messages: ImportMessage[];
+  movement_id: string | null;
+  spoken: { tipo: string; ativo: string; quantidade: string | null; preco: string | null; moeda: string | null; data: string | null } | null;
+  draft: {
+    trade_date: string;
+    type: MovementType;
+    broker_id: string;
+    ticker: string | null;
+    quantity: string | null;
+    unit_price: string | null;
+    amount: string | null;
+    income_kind: string | null;
+    opening_balance?: boolean;
+    orig_currency?: string | null;
+    orig_value?: string | null;
+    fx_date?: string | null;
+    fx_source?: "ptax" | "fechamento" | null;
+  } | null;
+};
+export type Proposal = { id: string; message_id: string; status: "pending" | "confirmed" | "cancelled"; items: ProposalItem[]; suggestions: OpeningSuggestion[] };
+export type ChatMessage = { id: string; role: "user" | "assistant"; content: string; input_mode: string | null; created_at: string; proposal: Proposal | null };
+export type ConversationSummary = { id: string; title: string; updated_at: string };
+export type Conversation = { id: string; title: string; messages: ChatMessage[] };
+export type ItemEdit = { quantidade?: string; preco?: string; data?: string; broker_id?: string; ticker?: string };
 export type OpeningBalanceIn = { ticker: string; trade_date: string; quantity: string; unit_cost: string; broker_id: string };
 export type ImportProblem = { index: number; message: string; columns?: string[] };
 export type ImportPreview = { batch: ImportBatch | null; problems: ImportProblem[]; file_indexes: number[] };
@@ -171,6 +207,31 @@ export function createApi(baseUrl: string, token: () => Promise<string | null>) 
         save: (name: string, mapping: Partial<Record<ProfileField, string>>, options: ProfileOptions) =>
           call<ImportProfile>("POST", "/v1/imports/profiles", { name, mapping, options }),
         remove: (id: string) => call<void>("DELETE", `/v1/imports/profiles/${id}`),
+      },
+    },
+    assistant: {
+      config: () => call<AssistantConfig>("GET", "/v1/assistant/config"),
+      conversations: () => call<ConversationSummary[]>("GET", "/v1/assistant/conversations"),
+      conversation: (id: string) => call<Conversation>("GET", `/v1/assistant/conversations/${id}`),
+      send: (text: string, conversationId: string | null, inputMode: "texto" | "voz") =>
+        call<{ conversation_id: string; messages: ChatMessage[] }>("POST", "/v1/assistant/messages", {
+          text,
+          conversation_id: conversationId,
+          input_mode: inputMode,
+        }),
+      answer: (proposalId: string, itemId: string, field: "ticker" | "broker_id", value: string) =>
+        call<Proposal>("POST", `/v1/assistant/proposals/${proposalId}/items/${itemId}/answer`, { field, value }),
+      edit: (proposalId: string, itemId: string, changes: ItemEdit) =>
+        call<Proposal>("PATCH", `/v1/assistant/proposals/${proposalId}/items/${itemId}`, changes),
+      remove: (proposalId: string, itemId: string) => call<Proposal>("DELETE", `/v1/assistant/proposals/${proposalId}/items/${itemId}`),
+      addOpening: (proposalId: string, body: OpeningBalanceIn) =>
+        call<Proposal>("POST", `/v1/assistant/proposals/${proposalId}/opening-balances`, body),
+      confirm: (proposalId: string) => call<Proposal>("POST", `/v1/assistant/proposals/${proposalId}/confirm`),
+      cancel: (proposalId: string) => call<Proposal>("POST", `/v1/assistant/proposals/${proposalId}/cancel`),
+      transcribe: (audio: Blob) => {
+        const form = new FormData();
+        form.append("audio", audio, "fala.webm");
+        return call<{ text: string }>("POST", "/v1/assistant/transcribe", form);
       },
     },
     allowlist: {

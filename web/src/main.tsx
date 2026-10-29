@@ -8,7 +8,6 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider } from "react-rou
 
 import { AuthProvider } from "./auth/AuthProvider";
 import { AppLayout } from "./routes/AppLayout";
-import { ComingSoon } from "./routes/ComingSoon";
 import { DemoLayout } from "./routes/DemoLayout";
 import { LoginPage } from "./routes/LoginPage";
 import { applyTheme } from "./theme/tokens";
@@ -20,6 +19,7 @@ const HomePage = lazy(() => import("./features/home/HomePage").then((m) => ({ de
 const PortfolioPage = lazy(() => import("./features/portfolio/PortfolioPage").then((m) => ({ default: m.PortfolioPage })));
 const LedgerPage = lazy(() => import("./features/ledger/LedgerPage").then((m) => ({ default: m.LedgerPage })));
 const ImportPage = lazy(() => import("./features/import/ImportPage").then((m) => ({ default: m.ImportPage })));
+const AssistantPage = lazy(() => import("./features/assistant/AssistantPage").then((m) => ({ default: m.AssistantPage })));
 const AdminPage = lazy(() => import("./features/admin/AdminPage").then((m) => ({ default: m.AdminPage })));
 const page = (node: React.ReactNode) => <Suspense fallback={null}>{node}</Suspense>;
 
@@ -33,7 +33,7 @@ const appScreens = [
   { path: "carteira", element: page(<PortfolioPage />) },
   { path: "lancamentos", element: page(<LedgerPage />) },
   { path: "importar", element: page(<ImportPage />) },
-  { path: "assistente", element: <ComingSoon title="Assistente" phase="Fase 5" /> },
+  { path: "assistente", element: page(<AssistantPage />) },
 ];
 
 const router = createBrowserRouter([
