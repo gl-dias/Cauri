@@ -38,6 +38,9 @@ export type Position = {
   instrument_id: string | null;
   label: string;
   name: string | null;
+  fi_kind: "CDB" | "LCI" | "LCA" | null;
+  fi_rate_pct: number | null;
+  fi_maturity_date: string | null;
   quantity: number | null;
   avg_cost: number | null;
   cost_basis: number;
@@ -66,21 +69,85 @@ export type MovementType =
   | "grupamento"
   | "bonificacao";
 
+export type Origin = "import" | "manual" | "chat";
+
 export type MovementRow = {
   id: string;
   trade_date: string;
   type: MovementType;
   income_kind: string | null;
   asset_class: AssetClassKey;
+  asset_id: string | null;
+  instrument_id: string | null;
   asset_label: string;
+  asset_name?: string | null;
   quantity: number | null;
   unit_price: number | null;
+  fees?: number;
   amount: number | null;
   factor: number | null;
+  fi_rate_pct?: number | null;
+  fi_maturity_date?: string | null;
+  broker_id?: string;
   broker_name: string | null;
-  origin: "import" | "manual" | "chat";
+  origin: Origin;
   origin_label: string | null;
+  notes?: string | null;
+  created_at?: string;
   voided_at: string | null;
+  void_reason?: string | null;
+};
+
+export type LedgerFilter = {
+  search?: string;
+  type?: MovementType;
+  assetClass?: AssetClassKey;
+  origin?: Origin;
+  showVoided?: boolean;
+};
+
+export type Paged<T> = { rows: T[]; total: number };
+
+export type Asset = {
+  id: string;
+  ticker: string;
+  name: string;
+  class: AssetClassKey;
+  issuer_code: string | null;
+  maturity_date: string | null;
+};
+
+export type Broker = { id: string; name: string; kind: "corretora" | "banco" | "exchange" };
+
+export type FiInstrument = {
+  id: string;
+  kind: "CDB" | "LCI" | "LCA";
+  issuer_name: string;
+  rate_pct: number;
+  maturity_date: string;
+  broker_id: string;
+  label: string;
+};
+
+export type JobRun = {
+  id: string;
+  job: string;
+  trigger: "cron" | "manual";
+  started_at: string;
+  finished_at: string | null;
+  status: "running" | "ok" | "partial" | "failed";
+  details: Record<string, unknown>;
+};
+
+export type JobSource = {
+  run_id: string;
+  source: string;
+  status: "ok" | "partial" | "failed" | "quota_exceeded" | "skipped";
+  requested: number;
+  succeeded: number;
+  failed: number;
+  error_sample: string | null;
+  duration_ms: number | null;
 };
 
 export type Goal = {
