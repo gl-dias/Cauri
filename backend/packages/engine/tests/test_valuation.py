@@ -136,3 +136,21 @@ def test_dias_antes_da_primeira_movimentacao_sao_ignorados():
     snaps = compute_snapshots(inputs([buy(WED, 1, 10)], prices), WEEK)
     assert next(s.snap_date for s in snaps) == WED
     assert all(isinstance(s.total.quota_value, Decimal) for s in snaps)
+
+
+def test_linha_do_cdi_com_os_mesmos_fluxos():
+    # Carteira só com CDB a 100% do CDI: a linha do CDI é o próprio patrimônio.
+    cdi = dict.fromkeys(WEEK, D("0.05"))
+    snaps = by_day(compute_snapshots(inputs([deposit(MON, "10000.00")], {}, cdi), WEEK))
+    for day in (MON, WED, FRI):
+        assert abs(snaps[day].cdi_equivalent - snaps[day].total.market_value) <= D("0.01")
+
+
+def test_linha_do_cdi_desconta_as_mesmas_saidas():
+    prices = {ASSET_A: dict.fromkeys(WEEK, D(10))}
+    cdi = dict.fromkeys(WEEK, D("0.05"))
+    movements = [buy(MON, 100, 10), sell(WED, 50, 10)]
+    snaps = by_day(compute_snapshots(inputs(movements, prices, cdi), WEEK))
+    assert snaps[MON].cdi_equivalent == D("1000.00")
+    # 1000 rende 2 dias de CDI (seg->ter, ter->qua) e saem 500 na quarta.
+    assert snaps[WED].cdi_equivalent == (D("1000.00") * D("1.0005") ** 2 - 500).quantize(D("0.01"))

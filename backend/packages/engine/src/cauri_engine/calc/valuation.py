@@ -105,6 +105,9 @@ class DaySnapshot:
     cdi_index: Decimal
     ipca_index: Decimal
     stale_count: int
+    # Quanto valeria o mesmo dinheiro, com as mesmas entradas e saídas nas mesmas datas,
+    # se tivesse rendido 100% do CDI. É a linha "CDI" do gráfico de evolução.
+    cdi_equivalent: Decimal = ZERO
 
 
 @dataclass(slots=True)
@@ -191,6 +194,8 @@ def compute_snapshots(inputs: PortfolioInputs, days: Iterable[date]) -> list[Day
 
     snapshots: list[DaySnapshot] = []
     cursor = 0
+    shadow = ZERO
+    prev_cdi = ONE
     for day in day_list:
         flows_total = _Flows()
         flows_class: dict[AssetClass, _Flows] = defaultdict(_Flows)
@@ -243,6 +248,12 @@ def compute_snapshots(inputs: PortfolioInputs, days: Iterable[date]) -> list[Day
             for k in sorted(broker_keys)
         }
 
+        day_cdi = cdi_index(inputs.cdi, inception, day)
+        # Entradas do dia começam a render a partir do dia (como um aporte em CDB), então o
+        # fator do dia só vale para o que já estava aplicado.
+        shadow = q2(shadow * day_cdi / prev_cdi + flows_total.inflow - flows_total.outflow)
+        prev_cdi = day_cdi
+
         snapshots.append(
             DaySnapshot(
                 snap_date=day,
@@ -250,9 +261,10 @@ def compute_snapshots(inputs: PortfolioInputs, days: Iterable[date]) -> list[Day
                 total=total,
                 by_class=by_class,
                 by_broker=by_broker,
-                cdi_index=cdi_index(inputs.cdi, inception, day),
+                cdi_index=day_cdi,
                 ipca_index=ipca_index(inputs.ipca_monthly, inception, day),
                 stale_count=sum(1 for p in positions if p.price_status is not PriceStatus.OK),
+                cdi_equivalent=shadow,
             )
         )
     return snapshots

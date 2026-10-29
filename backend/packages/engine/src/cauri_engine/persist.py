@@ -168,6 +168,7 @@ def _write(conn: Conn, user_id: UUID, snapshots: Iterable[DaySnapshot]) -> int:
                 s.cdi_index,
                 s.ipca_index,
                 s.stale_count,
+                s.cdi_equivalent,
             )
         )
         for p in s.positions:
@@ -208,8 +209,8 @@ def _write(conn: Conn, user_id: UUID, snapshots: Iterable[DaySnapshot]) -> int:
     with conn.cursor() as cur:
         cur.executemany(
             "insert into engine.portfolio_snapshots (user_id, snap_date, market_value, cost_basis,"
-            " net_flows, income, quota_value, cdi_index, ipca_index, stale_count)"
-            " values (%s, %s, %s, %s, %s, %s, round(%s, 12), round(%s, 16), round(%s, 16), %s)",
+            " net_flows, income, quota_value, cdi_index, ipca_index, stale_count, cdi_equivalent)"
+            " values (%s, %s, %s, %s, %s, %s, round(%s, 12), round(%s, 16), round(%s, 16), %s, %s)",
             portfolio,
         )
         cur.executemany(
