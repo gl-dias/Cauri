@@ -3,7 +3,7 @@
 -- depende do que já existe no banco (o demo real, ativos sincronizados etc.).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(52);
+select plan(57);
 
 -- Fixtures (como postgres) ---------------------------------------------------------
 -- ana: admin; bruno: usuário; carla: tinha acesso e foi removida; demo: usuário demo.
@@ -73,6 +73,13 @@ values ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-0000000
 insert into imports.rows (file_id, user_id, position, line_numbers, raw, status)
 values ('20000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a', 0, '{2}',
         '{"ativo": "AAAA3"}', 'error');
+insert into assistant.conversations (id, user_id, title) values
+  ('30000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000a', 'Conversa da ana');
+insert into assistant.messages (id, conversation_id, user_id, role, content) values
+  ('30000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000001',
+   '00000000-0000-4000-8000-00000000000a', 'user', 'comprei 3 petrobras');
+insert into assistant.proposals (message_id, user_id) values
+  ('30000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a');
 insert into imports.profiles (user_id, name, mapping, options)
 values ('00000000-0000-4000-8000-00000000000a', 'Corretora da Ana',
         '{"data": "Data", "tipo": "Operação", "ativo": "Papel"}', '{"broker_id": "corretora-a"}');
@@ -98,6 +105,9 @@ select is((select count(*)::int from imports.rows), 1, 'ana vê as linhas da pr�
 select throws_ok($$delete from imports.batches$$, '42501', null,
   'ninguém apaga lote de importação (descartar é mudar o status)');
 select is((select count(*)::int from imports.profiles), 1, 'ana vê o próprio perfil de importação');
+select is((select count(*)::int from assistant.messages) + (select count(*)::int from assistant.proposals), 2,
+  'ana vê a própria conversa com o assistente');
+select throws_ok($$delete from assistant.messages$$, '42501', null, 'ninguém apaga mensagem do assistente');
 
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
@@ -132,6 +142,11 @@ select throws_ok(
   $$insert into imports.batches (user_id) values ('00000000-0000-4000-8000-00000000000a')$$,
   '42501', null, 'bruno não cria lote de importação em nome da ana');
 select is((select count(*)::int from imports.profiles), 0, 'bruno não vê o perfil da ana');
+select is((select count(*)::int from assistant.conversations) + (select count(*)::int from assistant.proposals), 0,
+  'bruno não vê a conversa da ana com o assistente');
+select throws_ok(
+  $$insert into assistant.conversations (user_id, title) values ('00000000-0000-4000-8000-00000000000a', 'x')$$,
+  '42501', null, 'bruno não cria conversa em nome da ana');
 select throws_ok(
   $$insert into imports.profiles (user_id, name, mapping) values
     ('00000000-0000-4000-8000-00000000000a', 'Intruso', '{}')$$,
@@ -193,6 +208,7 @@ select throws_ok($$select count(*) from app.allowlist$$, '42501', null, 'anon n�
 select throws_ok($$select count(*) from marts.job_runs$$, '42501', null, 'anon não lê o log de jobs');
 select throws_ok($$select count(*) from imports.rows$$, '42501', null, 'anon não alcança as importações');
 select throws_ok($$select count(*) from imports.profiles$$, '42501', null, 'anon não alcança os perfis');
+select throws_ok($$select count(*) from assistant.messages$$, '42501', null, 'anon não alcança o assistente');
 select throws_ok(
   $$insert into ledger.movements (user_id, trade_date, asset_id, type, quantity, unit_price, broker_id, origin, idempotency_key)
     values ('00000000-0000-4000-8000-0000000000dd', date '2026-03-02', '10000000-0000-4000-8000-000000000004',
