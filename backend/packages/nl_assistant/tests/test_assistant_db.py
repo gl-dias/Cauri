@@ -63,6 +63,12 @@ def market(admin_url, reference_data):
                 " do update set close = excluded.close",
                 [ticker],
             )
+        conn.execute(
+            "insert into market.brokers (id, name, kind) values"
+            " ('exchange-teste', 'Exchange Teste', 'exchange'),"
+            " ('banco-teste', 'Banco Teste', 'banco')"
+            " on conflict (id) do nothing"
+        )
         for day, value in (("2011-03-09", "1.6700"), ("2011-03-10", "1.6710")):
             conn.execute(
                 "insert into market.indicators (series, ref_date, value, unit)"
@@ -260,6 +266,21 @@ def test_provento_e_edicao_do_cartao(user, as_user):
         [item] = edited.items
         assert item["price_suggested"] is None
         assert (item["draft"]["unit_price"], item["draft"]["trade_date"]) == ("29.5", "2011-03-08")
+
+
+def test_pergunta_de_corretora_traz_todas_e_exchange_so_em_cripto(user, as_user):
+    with as_user(user) as conn:
+        _, proposal = say(conn, user.id, "comprei 2 PETR4 a 30 e comprei 0,01 BTC a 9 mil reais")
+        acao, btc = primaries(proposal)
+        kinds = Ledger(conn).broker_kinds()
+        for item in (acao, btc):
+            assert (item["status"], item["question"]["field"]) == ("pergunta", "broker_id")
+        acao_options, btc_options = acao["question"]["options"], btc["question"]["options"]
+        assert {kinds[b] for b in acao_options} == {"corretora", "banco"}
+        assert len(acao_options) == sum(k != "exchange" for k in kinds.values())
+        assert acao_options.index(BROKER) < acao_options.index("banco-teste")
+        assert len(btc_options) == len(kinds)
+        assert kinds[btc_options[0]] == "exchange"
 
 
 def test_frase_sem_operacao_e_conversa_de_outro_usuario(user, make_user, as_user):

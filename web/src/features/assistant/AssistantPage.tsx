@@ -26,6 +26,7 @@ const STATUS: Record<ProposalItem["status"], { label: string; style: string }> =
   gravado: { label: "gravada", style: "bg-black/45 text-muted" },
 };
 const MAX_TEXT = 500; // o mesmo limite da API
+const CHIPS = 7; // opções da pergunta em botão (as sete corretoras); as demais vão para uma lista
 const EXAMPLES = ["comprei 3 petrobras e vendi 2 itau", "comprei 0,01 bitcoin a 120 mil dólares", "recebi 48 reais de taesa ontem"];
 
 export function AssistantPage() {
@@ -423,6 +424,7 @@ function ItemRow({ item, editable, onAnswer, onEdit, onRemove, readOnly }: {
 }) {
   const brokers = useBrokers();
   const brokerName = (id?: string) => brokers.data?.find((b) => b.id === id)?.name ?? (id === item.draft?.broker_id ? item.broker_name : undefined) ?? id ?? "";
+  const optionLabel = (o: string) => (item.question?.field === "broker_id" ? brokerName(o) : o);
   const [editing, setEditing] = useState(false);
   const d = item.draft;
   const [quantity, setQuantity] = useState(d?.quantity?.replace(".", ",") ?? "");
@@ -467,12 +469,26 @@ function ItemRow({ item, editable, onAnswer, onEdit, onRemove, readOnly }: {
       {item.question ? (
         <div className="space-y-2">
           <p className="text-[13px] font-medium text-gold">{item.question.text}</p>
-          <div className="flex flex-wrap gap-2">
-            {item.question.options.slice(0, 8).map((o) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {item.question.options.slice(0, CHIPS).map((o) => (
               <GlassButton key={o} disabled={readOnly} onClick={() => onAnswer(o)} className="h-9 px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-60">
-                {item.question!.field === "broker_id" ? brokerName(o) : o}
+                {optionLabel(o)}
               </GlassButton>
             ))}
+            {item.question.options.length > CHIPS ? (
+              <SelectInput
+                aria-label={item.question.field === "broker_id" ? "Outra corretora" : "Outra opção"}
+                value=""
+                disabled={readOnly}
+                onChange={(e) => e.target.value && onAnswer(e.target.value)}
+                className="h-9 w-auto min-w-36 text-[13px]"
+              >
+                <option value="">{item.question.field === "broker_id" ? "Outra corretora" : "Outras"}</option>
+                {item.question.options.slice(CHIPS).map((o) => (
+                  <option key={o} value={o}>{optionLabel(o)}</option>
+                ))}
+              </SelectInput>
+            ) : null}
           </div>
         </div>
       ) : null}

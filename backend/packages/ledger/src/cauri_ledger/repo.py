@@ -159,6 +159,11 @@ def all_brokers(conn: Conn) -> dict[str, str]:
     return {r["id"]: r["name"] for r in rows}
 
 
+def broker_kinds(conn: Conn) -> dict[str, str]:
+    rows = conn.execute("select id, kind from market.brokers").fetchall()
+    return {r["id"]: r["kind"] for r in rows}
+
+
 def find_brokers(conn: Conn, ids: Collection[str]) -> set[str]:
     if not ids:
         return set()

@@ -522,6 +522,10 @@ class Ledger:
         """Corretoras cadastradas: id -> nome."""
         return repo.all_brokers(self._conn)
 
+    def broker_kinds(self) -> dict[str, str]:
+        """Tipo de cada corretora cadastrada: id -> corretora, banco ou exchange."""
+        return repo.broker_kinds(self._conn)
+
     def indicator(self, series: str, since: date, until: date) -> dict[date, Decimal]:
         """Valores de uma série do BCB (CDI, PTAX_VENDA...) no intervalo."""
         return repo.indicator_values(self._conn, series, since, until)

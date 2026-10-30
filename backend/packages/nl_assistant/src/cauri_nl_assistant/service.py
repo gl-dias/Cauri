@@ -31,7 +31,7 @@ from cauri_ledger import (
     opening,
 )
 from cauri_nl_assistant.extraction import Extraction, ExtractionError, Extractor, SpokenOp
-from cauri_nl_assistant.resolver import Ask, NotFound, Resolved, Resolver
+from cauri_nl_assistant.resolver import Ask, NotFound, Resolved, Resolver, normalize
 
 # Moedas que não são posição: pagar com elas não gera contrapartida (como na importação).
 NOT_POSITIONS = frozenset({"BRL", "USD"})
@@ -405,8 +405,11 @@ def _build(
     broker = choices.get("broker_id") or _broker_for(ledger, user_id, resolution, asset_class)
     if broker is None:
         item["status"] = "pergunta"
-        options = list(ledger.brokers())
-        item["question"] = {"field": "broker_id", "text": "Em qual corretora?", "options": options}
+        item["question"] = {
+            "field": "broker_id",
+            "text": "Em qual corretora?",
+            "options": _broker_options(ledger, asset_class),
+        }
         return [item]
     item["choices"]["broker_id"] = broker
     item["broker_name"] = ledger.brokers().get(broker, broker)
@@ -536,6 +539,21 @@ def _broker_for(
         if brokers:
             return brokers[0]
     return None
+
+
+def _broker_options(ledger: Ledger, asset_class: AssetClass) -> list[str]:
+    """Todas as que fazem sentido para a classe: corretoras, bancos e, só em cripto, as
+    exchanges (que vêm primeiro). Em cada grupo, ordem alfabética."""
+    names, kinds = ledger.brokers(), ledger.broker_kinds()
+    order = (
+        ("exchange", "corretora", "banco")
+        if asset_class is AssetClass.CRIPTO
+        else ("corretora", "banco")
+    )
+    return sorted(
+        (b for b in names if kinds.get(b) in order),
+        key=lambda b: (order.index(kinds[b]), normalize(names[b])),
+    )
 
 
 class _NoRateError(Exception):
