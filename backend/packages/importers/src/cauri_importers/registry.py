@@ -44,7 +44,7 @@ def batch_warnings(adapter_names: Sequence[str]) -> list[str]:
     out: list[str] = []
     if "b3-movimentacao" in names and "b3-negociacao" not in names:
         out.append(
-            "As compras e vendas de ações e FIIs vêm do export de Negociação da B3; a "
+            "As compras e vendas de ações, FIIs e ETFs vêm do export de Negociação da B3; a "
             "Movimentação traz proventos, eventos e Tesouro. Se ainda não importou a "
             "Negociação desse período, envie também."
         )

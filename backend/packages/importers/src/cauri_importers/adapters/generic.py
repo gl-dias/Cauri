@@ -48,12 +48,21 @@ _COLUMNS: dict[str, tuple[str, ...]] = {
 _TYPES = {t.value: t for t in MovementType}
 # Posição que já existia antes do histórico: entra como compra marcada, com o custo médio.
 OPENING_WORDS = frozenset({"saldo_inicial", "saldo inicial", "posicao inicial", "opening"})
-_CLASSES = {"acao": "acao", "acoes": "acao", "fii": "fii", "fiis": "fii", "tesouro": "tesouro"}
+_CLASSES = {
+    "acao": "acao",
+    "acoes": "acao",
+    "fii": "fii",
+    "fiis": "fii",
+    "etf": "etf",
+    "etfs": "etf",
+    "tesouro": "tesouro",
+}
 _CLASSES |= {"renda_fixa": "renda_fixa", "renda fixa": "renda_fixa", "cripto": "cripto"}
 _INCOME = {k.value: k for k in IncomeKind}
 _DEFAULT_INCOME = {
     "acao": IncomeKind.DIVIDENDO,
     "fii": IncomeKind.RENDIMENTO,
+    "etf": IncomeKind.RENDIMENTO,
     "tesouro": IncomeKind.JUROS,
     "renda_fixa": IncomeKind.JUROS,
 }
@@ -93,7 +102,7 @@ def _item(row: SheetRow) -> Item:
     asset_class = _CLASSES.get(class_text)
     if asset_class is None:
         raise LineError(
-            f"Classe desconhecida: {class_text}. Use: acao, fii, tesouro, renda_fixa, cripto."
+            f"Classe desconhecida: {class_text}. Use: acao, fii, etf, tesouro, renda_fixa, cripto."
         )
 
     income_kind: IncomeKind | None = None

@@ -1,4 +1,4 @@
-"""Fechamento diário de ações e FIIs pela brapi.dev (plano gratuito: 1 ativo por chamada).
+"""Fechamento diário de ações, FIIs e ETFs pela brapi.dev (plano gratuito: 1 ativo por chamada).
 
 Só serve para o preço do dia: o plano gratuito tem 3 meses de histórico, então o
 histórico vem do COTAHIST.

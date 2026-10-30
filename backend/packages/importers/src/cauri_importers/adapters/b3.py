@@ -2,7 +2,7 @@
 
 A B3 consolida todas as corretoras. Os dois arquivos se completam:
 
-- **Negociação**: compras e vendas de ações e FIIs (à vista e fracionário), por corretora.
+- **Negociação**: compras e vendas de ações, FIIs e ETFs (à vista e fracionário), por corretora.
   Não traz corretagem nem emolumentos.
 - **Movimentação**: proventos, eventos corporativos, Tesouro Direto e a liquidação de cada
   negociação. A liquidação ("Transferência - Liquidação") é só o reflexo de uma compra ou
@@ -225,7 +225,7 @@ def _movimentacao(row: SheetRow, raw: dict[str, str]) -> Line:
 
     if kind in _EVENTS:
         if not isinstance(asset, Ticker):
-            raise LineError(f"{label} em produto que não é ação nem FII.")
+            raise LineError(f"{label} em produto que não é ação, FII nem ETF.")
         event = _EVENTS[kind]
         unit_price = None
         notes: tuple[str, ...] = ()
@@ -257,7 +257,8 @@ def _movimentacao(row: SheetRow, raw: dict[str, str]) -> Line:
             return Line(
                 numbers=numbers,
                 raw=raw,
-                ignored="Compra ou venda de ação ou FII: a operação vem do export de Negociação.",
+                ignored="Compra ou venda de ação, FII ou ETF: a operação vem do export de"
+                " Negociação.",
             )
         quantity = cells.number(c.get("quantidade"), "Quantidade")
         price = cells.optional_number(c.get("preco"), "Preço unitário")

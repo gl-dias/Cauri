@@ -105,7 +105,9 @@ def check_shape(draft: MovementDraft, today: date) -> list[Issue]:
         if is_fixed_income:
             issues.append(
                 Issue(
-                    IssueCode.NOT_ALLOWED, "Eventos corporativos são só para ações e FIIs.", "type"
+                    IssueCode.NOT_ALLOWED,
+                    "Eventos corporativos são só para ações, FIIs e ETFs.",
+                    "type",
                 )
             )
         _check_factor(issues, draft)
@@ -164,7 +166,7 @@ def check_shape(draft: MovementDraft, today: date) -> list[Issue]:
         issues.append(
             Issue(
                 IssueCode.NOT_ALLOWED,
-                "Saldo inicial é uma compra de ativo negociado (ação, FII, Tesouro, cripto).",
+                "Saldo inicial é uma compra de ativo negociado (ação, FII, ETF, Tesouro, cripto).",
                 "opening_balance",
             )
         )
@@ -223,10 +225,17 @@ def _check_factor(issues: list[Issue], draft: MovementDraft) -> None:
         )
 
 
+_CORPORATE_CLASSES = frozenset({AssetClass.ACAO, AssetClass.FII, AssetClass.ETF})
+
+
 def check_class(draft: MovementDraft, asset_class: AssetClass) -> list[Issue]:
     """Combinação entre tipo de movimentação e classe do ativo resolvido."""
-    if draft.type in CORPORATE_EVENTS and asset_class not in {AssetClass.ACAO, AssetClass.FII}:
+    if draft.type in CORPORATE_EVENTS and asset_class not in _CORPORATE_CLASSES:
         return [
-            Issue(IssueCode.NOT_ALLOWED, "Eventos corporativos são só para ações e FIIs.", "type")
+            Issue(
+                IssueCode.NOT_ALLOWED,
+                "Eventos corporativos são só para ações, FIIs e ETFs.",
+                "type",
+            )
         ]
     return []

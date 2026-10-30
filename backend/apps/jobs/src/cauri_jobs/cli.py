@@ -3,6 +3,9 @@
 Ordem para um banco novo (o ``just seed`` faz isso):
     sync-reference -> sync-assets -> seed-demo -> bootstrap-admin
 
+``etf-list`` não toca no banco: atualiza ``reference/etfs.yaml`` pela lista de fundos da B3
+(rodar à mão, de vez em quando, e commitar o arquivo).
+
 Todo dia útil (GitHub Actions): ``daily --pass first`` às 18h30 e ``daily --pass second``
 às 19h30 (horário de Brasília). Localmente, as variáveis vêm do ``.env``.
 """
@@ -38,7 +41,7 @@ from cauri_ingest_market import (
     sync_tesouro_assets,
 )
 from cauri_ingest_market.backfill import earliest_trade_date
-from cauri_ingest_market.sources import cotahist, tesouro
+from cauri_ingest_market.sources import b3_funds, cotahist, tesouro
 from cauri_jobs import health, seed
 from cauri_jobs.config import ConfigError, JobsConfig
 from cauri_jobs.demo import DEMO_B3_TICKERS, DEMO_CRYPTO_TICKERS
@@ -82,14 +85,34 @@ def cmd_sync_assets(cfg: JobsConfig, args: argparse.Namespace) -> None:
     with _http() as client:
         zip_path = cotahist.download(year, cfg.cache_dir, client, today=today)
         csv_text = tesouro.download(client)
+    etf_roots = [e["root"] for e in _yaml(cfg, "etfs.yaml") or []]
     with service_transaction(pool) as conn:
-        b3 = sync_b3_assets(conn, zip_path)
+        b3 = sync_b3_assets(conn, zip_path, etf_roots)
         td = sync_tesouro_assets(conn, tesouro.parse(csv_text))
         aliases = _sync_aliases(cfg, conn)
     print(
         f"B3: {b3.assets} ativos ({b3.inactive} inativos), {b3.issuers} emissores | "
         f"Tesouro: {td.assets} títulos ({td.inactive} inativos) | apelidos: {aliases}"
     )
+
+
+def cmd_etf_list(cfg: JobsConfig, _: argparse.Namespace) -> None:
+    with _http() as client:
+        etfs = b3_funds.fetch_etfs(client)
+    header = (
+        "# ETFs listados na B3, pela lista de fundos do site da B3 (gerado por\n"
+        "# `cauri-jobs etf-list`, não editar à mão). A carga do cadastro (sync-assets) usa a raiz\n"
+        "# para separar os ETFs de FI-Infra e Fiagro, que dividem o mesmo código no COTAHIST.\n"
+        f"# Atualizado em {today_sp():%d/%m/%Y}.\n"
+    )
+    rows = [{"root": e.root, "kind": e.kind, "name": e.name} for e in etfs]
+    body = yaml.safe_dump(
+        rows, allow_unicode=True, sort_keys=False, default_flow_style=None, width=200
+    )
+    (cfg.reference_dir / "etfs.yaml").write_bytes((header + body).encode())
+    kinds = sorted({e.kind for e in etfs})
+    counts = ", ".join(f"{k}: {sum(e.kind == k for e in etfs)}" for k in kinds)
+    print(f"ETFs: {len(etfs)} ({counts})")
 
 
 def cmd_backfill(cfg: JobsConfig, args: argparse.Namespace) -> None:
@@ -252,12 +275,13 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("sync-reference", help="corretoras, criptoativos e apelidos (reference/)")
-    p = sub.add_parser("sync-assets", help="ações e FIIs (COTAHIST) e títulos do Tesouro")
+    p = sub.add_parser("sync-assets", help="ações, FIIs e ETFs (COTAHIST) e títulos do Tesouro")
     p.add_argument("--year", type=int, help="ano do COTAHIST (padrão: o atual)")
     p = sub.add_parser("backfill", help="histórico de preços e indicadores")
     p.add_argument("--since", type=date.fromisoformat, help="AAAA-MM-DD (padrão: 1a movimentação)")
     p.add_argument("--until", type=date.fromisoformat, help="AAAA-MM-DD (padrão: ontem)")
     p.add_argument("--tickers", help="lista separada por vírgula (padrão: união das carteiras)")
+    sub.add_parser("etf-list", help="atualiza reference/etfs.yaml pela lista de fundos da B3")
     sub.add_parser("bootstrap-admin", help="coloca CAURI_ADMIN_EMAIL na allowlist como admin")
     p = sub.add_parser("daily", help="fechamento do dia e snapshots (job das 18h30 e 19h30)")
     p.add_argument("--pass", dest="pass_", choices=["first", "second"], default="first")
@@ -277,6 +301,7 @@ def main(argv: list[str] | None = None) -> None:
     commands = {
         "sync-reference": cmd_sync_reference,
         "sync-assets": cmd_sync_assets,
+        "etf-list": cmd_etf_list,
         "backfill": cmd_backfill,
         "bootstrap-admin": cmd_bootstrap_admin,
         "seed-demo": cmd_seed_demo,

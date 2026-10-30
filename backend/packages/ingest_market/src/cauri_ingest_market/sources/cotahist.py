@@ -1,10 +1,11 @@
 """COTAHIST: séries históricas oficiais da B3 (um arquivo ZIP por ano, texto de largura fixa).
 
 Cada registro tem 245 caracteres. Usamos só o mercado à vista (TPMERC 010) dos códigos
-BDI 02 (lote padrão: ações e units), 08 (empresas em recuperação judicial) e 12 (fundos
-imobiliários). BDRs, ETFs e Fiagro têm códigos próprios e ficam de fora por enquanto. O
+BDI 02 (lote padrão: ações e units), 08 (empresas em recuperação judicial), 12 (fundos
+imobiliários) e 14 (fundos de índice, junto com FI-Infra e Fiagro: quem separa os ETFs é a
+lista da B3, ver ``b3_funds``). BDRs têm códigos próprios e ficam de fora por enquanto. O
 próprio Ibovespa aparece no BDI 02 como IBOV11 (ISIN com tipo IND); índice não é ativo e
-também fica de fora.
+também fica de fora. ETFs de renda fixa (IMAB11, FIXA11) não estão no arquivo.
 
 Preços vêm com duas casas implícitas e podem estar cotados por lote (FATCOT), então o
 preço unitário é ``PREULT / 100 / FATCOT``.
@@ -31,7 +32,9 @@ SPOT_MARKET = "010"
 BDI_STOCKS = "02"
 BDI_JUDICIAL_RECOVERY = "08"
 BDI_REITS = "12"
+BDI_FUNDS = "14"
 ISIN_INDEX = "IND"  # tipo do instrumento no ISIN (posições 7 a 9): BRIBOVINDM18
+_BDIS = (BDI_STOCKS, BDI_JUDICIAL_RECOVERY, BDI_REITS, BDI_FUNDS)
 _CURRENT_YEAR_MAX_AGE_S = 6 * 3600
 _ATTEMPTS = 4
 _RETRY_WAIT_S = 5.0  # multiplicado pelo número da tentativa
@@ -54,7 +57,7 @@ def parse_line(line: str) -> CotahistQuote | None:
     if len(line) < 245 or line[0:2] != "01":
         return None
     bdi = line[10:12]
-    if line[24:27] != SPOT_MARKET or bdi not in (BDI_STOCKS, BDI_JUDICIAL_RECOVERY, BDI_REITS):
+    if line[24:27] != SPOT_MARKET or bdi not in _BDIS:
         return None
     isin = line[230:242].strip()
     if isin[6:9] == ISIN_INDEX:

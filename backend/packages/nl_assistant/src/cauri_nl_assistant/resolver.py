@@ -106,7 +106,7 @@ class Resolver:
         candidates = [
             a
             for a in self._ledger.issuer_assets(issuer)
-            if a.asset_class in {AssetClass.ACAO, AssetClass.FII}
+            if a.asset_class in {AssetClass.ACAO, AssetClass.FII, AssetClass.ETF}
         ]
         if not candidates:
             return NotFound(f'Não achei ativos de "{spoken}" no cadastro.')

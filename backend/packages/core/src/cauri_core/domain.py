@@ -12,6 +12,7 @@ from uuid import UUID
 class AssetClass(StrEnum):
     ACAO = "acao"
     FII = "fii"
+    ETF = "etf"
     TESOURO = "tesouro"
     RENDA_FIXA = "renda_fixa"
     CRIPTO = "cripto"

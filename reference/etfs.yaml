@@ -1,0 +1,242 @@
+# ETFs listados na B3, pela lista de fundos do site da B3 (gerado por
+# `cauri-jobs etf-list`, não editar à mão). A carga do cadastro (sync-assets) usa a raiz
+# para separar os ETFs de FI-Infra e Fiagro, que dividem o mesmo código no COTAHIST.
+# Atualizado em 30/10/2026.
+- {root: 03BK, kind: ETF-RF, name: GLPG JR03A}
+- {root: 10BK, kind: ETF-RF, name: GLPG JR10A}
+- {root: 3PRE, kind: ETF-RF, name: GLPG PRE3A}
+- {root: 5PRE, kind: ETF-RF, name: IT NOW PRÉ 5}
+- {root: ABTC, kind: ETF-CRIPTO, name: BTGP ABTC}
+- {root: ACWI, kind: ETF, name: XPETFACWI}
+- {root: AGGX, kind: ETF-INT-RF, name: TREND US BND}
+- {root: AGRI, kind: ETF, name: BB ETF IAGRO}
+- {root: ALUG, kind: ETF, name: INVESTO ALUG}
+- {root: AMAB, kind: ETF-RF, name: BTGP AMAB}
+- {root: AREA, kind: ETF-RF, name: BTGP AREA}
+- {root: ARGE, kind: ETF, name: INVESTOARGE}
+- {root: AUPO, kind: ETF-RF, name: BTGP AUPO}
+- {root: AURO, kind: ETF, name: ETF BV AURO}
+- {root: AUVP, kind: ETF, name: BTGTEVA AUVP}
+- {root: B3BR, kind: ETF, name: IT NOW B3BR+}
+- {root: B5MB, kind: ETF-RF, name: BRAD IMA-B5M}
+- {root: B5P2, kind: ETF-RF, name: IT NOW B5P2}
+- {root: BBOI, kind: ETF, name: BB ETF BOI G}
+- {root: BBOV, kind: ETF, name: BB ETF IBOV}
+- {root: BBSD, kind: ETF, name: BB ETF SP DV}
+- {root: BCIC, kind: ETF, name: B INDEX CICL}
+- {root: BDAP, kind: ETF-RF, name: BB ETF DAP5}
+- {root: BDEF, kind: ETF, name: B INDEX DEFE}
+- {root: BDOM, kind: ETF, name: INVESTO BDOM}
+- {root: BEST, kind: ETF, name: INVESTOBEST}
+- {root: BITC, kind: ETF-CRIPTO, name: BPTEVABITC}
+- {root: BITH, kind: ETF-CRIPTO, name: BITCOIN HASH}
+- {root: BITI, kind: ETF-CRIPTO, name: ETF GALAXY B}
+- {root: BIZD, kind: ETF, name: INVESTO BIZD}
+- {root: BLFT, kind: ETF-RF, name: B INDEX BLFT}
+- {root: BMMT, kind: ETF, name: B INDEX MOME}
+- {root: BNDX, kind: ETF-INT-RF, name: INVESTO BNDX}
+- {root: BNKS, kind: ETF, name: INVESTOBANK}
+- {root: BOL5, kind: ETF-RF, name: B INDEX BOL}
+- {root: BOVA, kind: ETF, name: ISHARES BOVA}
+- {root: BOVB, kind: ETF, name: ETF BRA IBOV}
+- {root: BOVS, kind: ETF, name: SAFRAETFIBOV}
+- {root: BOVV, kind: ETF, name: IT NOW IBOV}
+- {root: BOVX, kind: ETF, name: TREND IBOVX}
+- {root: BPRE, kind: ETF-RF, name: B INDEX BPRE}
+- {root: BRAX, kind: ETF, name: ISHARES BRAX}
+- {root: BRAZ, kind: ETF, name: BB ETF BRAZ}
+- {root: BREW, kind: ETF, name: B INDEX BREW}
+- {root: BRIA, kind: ETF, name: B-INDEX BRIA}
+- {root: BRXC, kind: ETF, name: BTGIABRSELEC}
+- {root: BTER, kind: ETF, name: INVESTOBTER}
+- {root: BVBR, kind: ETF, name: INVCONSTQBRL}
+- {root: BXPO, kind: ETF, name: INVESTO BXPO}
+- {root: BZEQ, kind: ETF, name: BTGP BZEQ}
+- {root: CAPE, kind: ETF, name: ISHARES CAP5}
+- {root: CASA, kind: ETF, name: ETF CASA}
+- {root: CDIB, kind: ETF-RF, name: IT NOW DIPCA}
+- {root: CHIP, kind: ETF, name: INVESTO CHIP}
+- {root: CLOB, kind: ETF-INT-RF, name: BTGP CLOB}
+- {root: CMDB, kind: ETF, name: BTG COMMODIT}
+- {root: COIN, kind: ETF, name: ETF BV COIN}
+- {root: CORN, kind: ETF, name: BB ETF MILHO}
+- {root: CRPT, kind: ETF-CRIPTO, name: CRIPTO20 EMP}
+- {root: DEBB, kind: ETF-RF, name: BTG DEB DI}
+- {root: DEFI, kind: ETF-CRIPTO, name: DEFI HASH}
+- {root: DIGY, kind: ETF, name: OBTC DIG YLD}
+- {root: DINF, kind: ETF, name: BTGP DINF}
+- {root: DIVD, kind: ETF, name: IT NOW DIVD}
+- {root: DIVO, kind: ETF, name: IT NOW IDIV}
+- {root: DOLA, kind: ETF, name: BB ETF DOLAR}
+- {root: DOLB, kind: ETF, name: BTG SP DOLAR}
+- {root: DOLX, kind: ETF, name: TREND DOLAR}
+- {root: DVER, kind: ETF, name: BB ETF DVER}
+- {root: EBIT, kind: ETF-CRIPTO, name: EMPIRICUSBTC}
+- {root: ECOO, kind: ETF, name: ISHARES ECOO}
+- {root: EETH, kind: ETF-CRIPTO, name: BPTEVAETHE}
+- {root: ELAS, kind: ETF, name: SAFRAETFELAS}
+- {root: ESGB, kind: ETF, name: ETF ESG BTG}
+- {root: ETHE, kind: ETF-CRIPTO, name: ETHER HASH}
+- {root: ETHY, kind: ETF-CRIPTO, name: ETF BV ETHY}
+- {root: EUAT, kind: ETF, name: GLPG EUA TM}
+- {root: EWBZ, kind: ETF, name: ISHARES EQWE}
+- {root: FBOV, kind: ETF-RF, name: GLPG IBOV FA}
+- {root: FDIV, kind: ETF-RF, name: GLPG IDIV FA}
+- {root: FIND, kind: ETF, name: IT NOW IFNC}
+- {root: FIXA, kind: ETF-RF, name: BB FIXA11}
+- {root: FIXX, kind: ETF, name: ETF FIXX}
+- {root: FMUN, kind: ETF-RF, name: GLPG MUNDO F}
+- {root: FOMO, kind: ETF-CRIPTO, name: FOMO HASH}
+- {root: FSPY, kind: ETF-RF, name: GLPG SP500 F}
+- {root: GBIT, kind: ETF-CRIPTO, name: GLPG BITCOIN}
+- {root: GBTC, kind: ETF-CRIPTO, name: GBTC BV HASH}
+- {root: GDIV, kind: ETF, name: ETF BV GDIV}
+- {root: GENB, kind: ETF, name: ETF BTG GENB}
+- {root: GICP, kind: ETF-RF, name: GENIAL DEBDI}
+- {root: GLDI, kind: ETF, name: IT NOW GOLD}
+- {root: GLDX, kind: ETF, name: INVESTO GLDX}
+- {root: GLFT, kind: ETF-RF, name: GLPG TEVALFT}
+- {root: GLMP, kind: ETF, name: GLPG ENE LMP}
+- {root: GOAT, kind: ETF-INT-RF, name: IT NOW SP+RF}
+- {root: GOLB, kind: ETF, name: BTGP GOLB}
+- {root: GOLD, kind: ETF, name: TREND OURO}
+- {root: GOLX, kind: ETF, name: TREND OURO H}
+- {root: GOVE, kind: ETF, name: IT NOW IGCT}
+- {root: GPCA, kind: ETF-RF, name: GRAO IPCA 2Y}
+- {root: GPOS, kind: ETF-RF, name: GRAO LFTB 2Y}
+- {root: GPUS, kind: ETF, name: INVESTOGPS&P}
+- {root: GXUS, kind: ETF, name: GLPG GLBEXUS}
+- {root: HASH, kind: ETF-CRIPTO, name: HASHDEX NCI}
+- {root: HERT, kind: ETF-FII, name: ETF HEQREITS}
+- {root: HGBR, kind: ETF-RF, name: NUIBOXXBRLIG}
+- {root: HIGH, kind: ETF, name: NUIBOVHIGHBT}
+- {root: HODL, kind: ETF-CRIPTO, name: INVESTO HODL}
+- {root: HTEK, kind: ETF, name: IT NOW HCARE}
+- {root: HYBR, kind: ETF-RF, name: NUIBOXXBRLHY}
+- {root: IB5M, kind: ETF-RF, name: IT NOW IB5M}
+- {root: IBOB, kind: ETF, name: PACTUAL IBOV}
+- {root: IDKA, kind: ETF-RF, name: IT NOW PRE 3}
+- {root: IMAB, kind: ETF-RF, name: IT NOW IMA-B}
+- {root: IMBB, kind: ETF-RF, name: BRAD IMA-B}
+- {root: IRFM, kind: ETF-RF, name: IT NOW IRF-M}
+- {root: ISUS, kind: ETF, name: IT NOW ISE}
+- {root: IVVB, kind: ETF, name: ISHARE SP500}
+- {root: IVWO, kind: ETF, name: INVESTOEMERG}
+- {root: IWMI, kind: ETF, name: ETF BV IWMI}
+- {root: JOGO, kind: ETF, name: INVESTO JOGO}
+- {root: LFIN, kind: ETF-RF, name: BTGP LFIN}
+- {root: LFIX, kind: ETF-RF, name: INVESTO LFIX}
+- {root: LFTB, kind: ETF-RF, name: INVESTO LFTB}
+- {root: LFTI, kind: ETF-RF, name: IT NOW SELIC}
+- {root: LFTS, kind: ETF-RF, name: INVESTO LFTS}
+- {root: LFTX, kind: ETF-RF, name: TREND SELIC}
+- {root: LIQB, kind: ETF-RF, name: BTGP LIQB}
+- {root: LLBR, kind: ETF-RF, name: NUSPLLBRHEDG}
+- {root: LLFT, kind: ETF-RF, name: BTG TEVALFT}
+- {root: LTBX, kind: ETF-RF, name: TREND CASH B}
+- {root: LTMG, kind: ETF-RF, name: LETO MARGEM}
+- {root: LTNB, kind: ETF-RF, name: BTGP IRFM}
+- {root: LVOL, kind: ETF, name: NUIBOVLOWVOL}
+- {root: MARG, kind: ETF-RF, name: BTG MARGDEB}
+- {root: MATB, kind: ETF, name: IT NOW IMAT}
+- {root: META, kind: ETF-CRIPTO, name: META HASH}
+- {root: MIDB, kind: ETF-RF, name: BTGP B2035}
+- {root: MILL, kind: ETF, name: DIGITAL LIFE}
+- {root: MUND, kind: ETF, name: INVESTOMUND}
+- {root: NASD, kind: ETF, name: TREND NASDAQ}
+- {root: NB02, kind: ETF-RF, name: NUIPCA02ANOS}
+- {root: NB05, kind: ETF-RF, name: NUIPCA05ANOS}
+- {root: NB10, kind: ETF-RF, name: NUIPCA10ANOS}
+- {root: NBIT, kind: ETF-CRIPTO, name: NUBITCOINFUT}
+- {root: NBOV, kind: ETF, name: NUIBOVBRMAIS}
+- {root: NCDI, kind: ETF-RF, name: NUCDISELICB3}
+- {root: NDIV, kind: ETF, name: NU REND IBOV}
+- {root: NLFA, kind: ETF-RF, name: NULFSRANBIMA}
+- {root: NSDV, kind: ETF, name: NU IBOV DIV}
+- {root: NTNF, kind: ETF-RF, name: INVESTOV8PRE}
+- {root: NTNS, kind: ETF-RF, name: INVESTO NTNS}
+- {root: NUCL, kind: ETF, name: INVESTO NUCL}
+- {root: OBRA, kind: ETF, name: TREND INFRA}
+- {root: OLEO, kind: ETF, name: INVESTOOLEO}
+- {root: OROF, kind: ETF, name: GLPG OURO}
+- {root: OURO, kind: ETF, name: B INDEX OURO}
+- {root: PACB, kind: ETF-RF, name: BTG INF LONG}
+- {root: PACC, kind: ETF-RF, name: BTGINF CURTO}
+- {root: PACG, kind: ETF-RF, name: BTGINF GERAL}
+- {root: PACL, kind: ETF-RF, name: BTGP IMAB5}
+- {root: PEVC, kind: ETF, name: INVESTO PEVC}
+- {root: PFJR, kind: ETF-RF, name: BTGP PFJR}
+- {root: PHIP, kind: ETF-RF, name: ITBRCURTOPHR}
+- {root: PIBB, kind: ETF, name: IT NOW PIBB}
+- {root: PIPE, kind: ETF, name: ETF BV PIPE}
+- {root: PKIN, kind: ETF, name: B INDEX PKIN}
+- {root: POSB, kind: ETF-RF, name: GLGP SELIC B}
+- {root: PRAF, kind: ETF, name: GLPG PRATA}
+- {root: PREX, kind: ETF-RF, name: TREND IRFM}
+- {root: QBTC, kind: ETF-CRIPTO, name: QR BITCOIN}
+- {root: QDFI, kind: ETF-CRIPTO, name: QR DEFI}
+- {root: QETH, kind: ETF-CRIPTO, name: QR ETHER}
+- {root: QLBR, kind: ETF, name: RBINVESTOETF}
+- {root: QQQI, kind: ETF, name: ETF BV QQQI}
+- {root: QQQQ, kind: ETF, name: ETF QQQQ}
+- {root: QSOL, kind: ETF-CRIPTO, name: QR SOLANA}
+- {root: RARA, kind: ETF, name: INVESTRARA11}
+- {root: REAL, kind: ETF, name: TREND REAL}
+- {root: REVE, kind: ETF, name: IT NOW GREEN}
+- {root: RICO, kind: ETF, name: ETF RICO}
+- {root: RVDI, kind: ETF, name: INVESTORVDI}
+- {root: S1BK, kind: ETF, name: BTGP S1BK}
+- {root: SCVB, kind: ETF, name: INVESTO SCVB}
+- {root: SELI, kind: ETF-RF, name: BB ETF SELIC}
+- {root: SFIX, kind: ETF-RF, name: BTGP SFIX}
+- {root: SILK, kind: ETF, name: IT NOW CHINA}
+- {root: SLVR, kind: ETF, name: TREND PRATA}
+- {root: SMAB, kind: ETF, name: BTG SMLL CAP}
+- {root: SMAC, kind: ETF, name: IT NOW SMALL}
+- {root: SMAL, kind: ETF, name: ISHARES SMAL}
+- {root: SOLH, kind: ETF-CRIPTO, name: SOLANA HASH}
+- {root: SPBZ, kind: ETF, name: BTG SPHEDGE}
+- {root: SPUB, kind: ETF, name: SAFRAIBOVEST}
+- {root: SPVT, kind: ETF, name: SAFRAIBOVPVT}
+- {root: SPXB, kind: ETF, name: BTG S&P 500}
+- {root: SPXH, kind: ETF, name: TREND SP BRL}
+- {root: SPXI, kind: ETF, name: IT NOW SPXI}
+- {root: SPXR, kind: ETF, name: IT NOW SP BR}
+- {root: SPXU, kind: ETF, name: TRD SPX USD}
+- {root: SPYI, kind: ETF, name: ETF BV SPYI}
+- {root: SPYR, kind: ETF, name: B INDEX SPYR}
+- {root: SVAL, kind: ETF, name: INVESTO SVAL}
+- {root: T10R, kind: ETF-RF, name: IT NOW TSY10}
+- {root: TECK, kind: ETF, name: IT NOW TECK}
+- {root: TECX, kind: ETF, name: B INDEX TECX}
+- {root: TOPY, kind: ETF, name: ETF BV TOPY}
+- {root: TRIG, kind: ETF, name: TRG SMIC CAP}
+- {root: USDB, kind: ETF-INT-RF, name: INVESTO USDB}
+- {root: USTK, kind: ETF, name: INVESTO USTK}
+- {root: UTEC, kind: ETF, name: XPETFUSTECH}
+- {root: UTLI, kind: ETF, name: IT NOW UTIL}
+- {root: UTLL, kind: ETF, name: INVESTOUTIL}
+- {root: VTBR, kind: ETF, name: NUVTGLOBALBR}
+- {root: VTUS, kind: ETF, name: NUVTGLOBALUS}
+- {root: VWRA, kind: ETF, name: INVESTOVWRA}
+- {root: WEB3, kind: ETF-CRIPTO, name: SMART HASH}
+- {root: WEJR, kind: ETF-RF, name: BTGP WEJR}
+- {root: WRLD, kind: ETF, name: INVESTO WRLD}
+- {root: XB30, kind: ETF-RF, name: TREND NTNB30}
+- {root: XB35, kind: ETF-RF, name: TREND NTNB35}
+- {root: XB45, kind: ETF-RF, name: TREND NTNB45}
+- {root: XB50, kind: ETF-RF, name: TREND NTNB50}
+- {root: XB60, kind: ETF-RF, name: TREND NTNB60}
+- {root: XBCI, kind: ETF, name: ETF BV XBCI}
+- {root: XBIT, kind: ETF-CRIPTO, name: TREND BTC}
+- {root: XBOV, kind: ETF, name: CAIXAETFXBOV}
+- {root: XCAP, kind: ETF, name: TREND SMALL}
+- {root: XCDI, kind: ETF-RF, name: TRD CORE DI}
+- {root: XETH, kind: ETF-CRIPTO, name: TREND ETH}
+- {root: XF33, kind: ETF-RF, name: TREND DI 33}
+- {root: XF37, kind: ETF-RF, name: TREND DI 37}
+- {root: XFIX, kind: ETF-FII, name: TREND IFIX-L}
+- {root: XINA, kind: ETF, name: XPETFCHINA}
+- {root: XRPH, kind: ETF-CRIPTO, name: XRP HASH}
+- {root: XSPI, kind: ETF, name: ETF BV XSPI}
+- {root: XVAL, kind: ETF, name: TREND VALOR}

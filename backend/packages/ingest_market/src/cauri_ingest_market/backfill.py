@@ -2,7 +2,7 @@
 
 Fontes por classe (a brapi fica só para o fechamento diário, porque o plano gratuito
 tem 3 meses de histórico):
-  * ações e FIIs: COTAHIST da B3;
+  * ações, FIIs e ETFs: COTAHIST da B3;
   * Tesouro: CSV do Tesouro Transparente;
   * cripto: CoinGecko (BRL e USD; o plano Demo cobre até 365 dias);
   * CDI, Selic meta, Selic efetiva e IPCA: SGS do Banco Central.
@@ -115,7 +115,7 @@ def run_backfill(
         by_class.setdefault(a.asset_class, []).append(a)
 
     steps: list[tuple[str, Callable[[Conn], SourceResult]]] = []
-    b3 = by_class.get("acao", []) + by_class.get("fii", [])
+    b3 = by_class.get("acao", []) + by_class.get("fii", []) + by_class.get("etf", [])
     if b3:
         steps.append(
             ("cotahist", lambda c: _cotahist(c, run_id, b3, since, until, client, cache_dir))

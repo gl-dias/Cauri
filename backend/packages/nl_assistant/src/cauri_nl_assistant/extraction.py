@@ -98,7 +98,7 @@ TOOL = {
 }
 
 SYSTEM = (
-    "Você lê frases em português sobre operações de investimento (ações e FIIs da B3,"
+    "Você lê frases em português sobre operações de investimento (ações, ETFs e FIIs da B3,"
     " Tesouro Direto e cripto) e registra cada operação com a ferramenta {tool}. Regras:"
     " devolva o ativo e a corretora exatamente como foram falados, sem converter para ticker;"
     " não invente quantidade, preço, moeda, data nem corretora que não foram ditos (use"

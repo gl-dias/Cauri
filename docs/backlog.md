@@ -21,3 +21,19 @@ entrou ainda.
   P2P, depósitos e saques e o extrato de transações seguem o layout público, com fixtures
   inventadas. Conferir também o fuso do "Created Time" do P2P (hoje tratado como UTC, como os
   outros exports).
+
+## Mercado
+
+- **ETFs de renda fixa** (IMAB11, FIXA11, B5P211, LFTS11...). Estão na lista de ETFs da B3
+  (`reference/etfs.yaml`, tipo `ETF-RF`), mas não aparecem no mercado à vista do COTAHIST,
+  então não entram no cadastro nem têm histórico. Precisam de outra fonte para o cadastro
+  (o `tradingCode` da lista da B3) e para o histórico (a brapi gratuita guarda só 3 meses).
+- **FI-Infra e Fiagro** (KDIF11, SNAG11...). Ficam de fora do cadastro: dividem com os ETFs
+  o código BDI 14 do COTAHIST e a lista de fundos da B3 separa cada tipo. Entrariam como
+  classe própria ou junto dos FIIs, que têm o mesmo jeito de rendimento.
+- **Lista de ETFs atualizada à mão.** `cauri-jobs etf-list` regrava `reference/etfs.yaml`
+  pelo serviço do site da B3, que não é documentado e fica atrás do Cloudflare (por isso não
+  roda nos jobs). ETF novo só entra no cadastro depois de rodar o comando, commitar o
+  arquivo e rodar o "Preparar produção".
+- **IR de ETF**, quando o IR entrar: ETF de renda variável não tem a isenção de R$ 20 mil
+  por mês das ações e paga 15% em qualquer venda com lucro.

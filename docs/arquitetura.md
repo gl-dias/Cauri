@@ -392,8 +392,8 @@ migrations rodam no CI contra o Supabase local antes do push.
 
 | uso | fonte | observação |
 |---|---|---|
-| fechamento diário de ações e FIIs | brapi.dev | só isso; token em `BRAPI_API_KEY`; cota mensal controlada em `ops.quota_usage`, sem retry em erro de limite |
-| histórico de ações e FIIs (backfill, seed do demo) | COTAHIST da B3 | oficial e grátis; também é a lista oficial de tickers do autocomplete |
+| fechamento diário de ações, FIIs e ETFs | brapi.dev | só isso; token em `BRAPI_API_KEY`; cota mensal controlada em `ops.quota_usage`, sem retry em erro de limite |
+| histórico de ações, FIIs e ETFs (backfill, seed do demo) | COTAHIST da B3 | oficial e grátis; também é a lista oficial de tickers do autocomplete |
 | Tesouro Direto (diário e histórico) | CSV do Tesouro Transparente | oficial e grátis; sai por volta das 10h do dia seguinte, então o job das 18h30 grava o PU de D-1, marcado como D-1 |
 | CDI, Selic meta, Selic efetiva, IPCA | API SGS do Banco Central | séries 12, 432, 1178 e 433 |
 | cripto (BRL e USD) | CoinGecko Demo | vários ativos por chamada, 365 dias de histórico; crédito "Data provided by CoinGecko" no rodapé |
@@ -719,7 +719,7 @@ de exemplo fica em `reference/import-template/` e no botão "Template" da tela I
 | `data` | sim | `15/03/2026` | data da operação |
 | `tipo` | sim | `compra` | compra, venda, aporte, resgate, provento, desdobramento, grupamento, bonificacao, saldo_inicial (preço = custo médio) |
 | `ativo` | sim | `PETR4` | ticker, nome do título do Tesouro ou rótulo do CDB/LCI |
-| `classe` | sim | `acao` | acao, fii, tesouro, renda_fixa, cripto |
+| `classe` | sim | `acao` | acao, fii, etf, tesouro, renda_fixa, cripto |
 | `quantidade` | depende | `100` | compra e venda |
 | `preco` | depende | `38,45` | preço unitário em compra e venda; na bonificação, o custo atribuído por ação nova |
 | `fator` | depende | `2` | desdobramento e grupamento: ações novas por ação antiga (`2` = 1 vira 2, `0,1` = 10 viram 1); bonificação: ações novas por ação possuída (`0,1` = 10%) |

@@ -48,13 +48,14 @@ NOT_POSITIONS = frozenset({"BRL", "USD"})
 _INCOME_BY_CLASS = {
     AssetClass.ACAO: IncomeKind.DIVIDENDO,
     AssetClass.FII: IncomeKind.RENDIMENTO,
+    AssetClass.ETF: IncomeKind.RENDIMENTO,
     AssetClass.TESOURO: IncomeKind.JUROS,
     AssetClass.CRIPTO: IncomeKind.RENDIMENTO,
 }
 _PRICE_PLACES = Decimal("1e-10")
 _UNSUPPORTED = (
-    "O assistente registra compra, venda, provento e saldo inicial de ações, FIIs, Tesouro e "
-    "cripto. Para renda fixa e eventos, use o lançamento manual."
+    "O assistente registra compra, venda, provento e saldo inicial de ações, FIIs, ETFs, "
+    "Tesouro e cripto. Para renda fixa e eventos, use o lançamento manual."
 )
 
 

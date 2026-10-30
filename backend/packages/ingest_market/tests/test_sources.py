@@ -1,6 +1,8 @@
 """Parsers das fontes de mercado, com amostras reais das respostas (sem rede)."""
 
+import base64
 import io
+import json
 import zipfile
 from datetime import date
 from decimal import Decimal
@@ -9,7 +11,7 @@ import httpx
 import pytest
 
 from cauri_ingest_market.reference import normalize_alias, sync_aliases
-from cauri_ingest_market.sources import bcb_sgs, coingecko, cotahist, tesouro
+from cauri_ingest_market.sources import b3_funds, bcb_sgs, coingecko, cotahist, tesouro
 
 # Linhas reais do COTAHIST_A2026 (05/01/2026).
 PETR4 = (
@@ -23,6 +25,18 @@ HGLG11 = (
     "000000001580700000000158100000000015699"
     "000000001572800000000157350000000015735000000001575623960000000000000094297000000001483161587"
     "000000000000009999123100000010000000000000BRHGLGCTF004291"
+)
+BOVA11 = (
+    "012026033014BOVA11      010ISHARES BOVACI           R$  "
+    "000000001799100000000181000000000017845"
+    "000000001797300000000179000000000017900000000001792730967000000000003134093000000056329796285"
+    "000000000000009999123100000010000000000000BRBOVACTF003118"
+)
+KDIF11 = (
+    "012026052114KDIF11      010KINEA INFRAFCI           R$  "
+    "000000001234000000000123990000000012215"
+    "000000001227400000000122190000000012219000000001225406876000000000000042482000000000521434421"
+    "000000000000009999123100000010000000000000BRKDIFCTF003165"
 )
 IBOV11 = (
     "012026010702IBOV11      010IBOVESPA    IBO/         R$  "
@@ -57,6 +71,12 @@ class TestCotahist:
         bdr = PETR4[:10] + "34" + PETR4[12:]
         assert cotahist.parse_line(bdr) is None
 
+    def test_le_fundo_de_indice_do_bdi_de_fundos(self):
+        quote = cotahist.parse_line(BOVA11)
+        assert quote is not None
+        assert (quote.ticker, quote.bdi, quote.spec) == ("BOVA11", cotahist.BDI_FUNDS, "CI")
+        assert quote.close == Decimal("179.00")
+
     def test_ignora_o_indice_no_bdi_de_acoes(self):
         assert IBOV11[10:12] == cotahist.BDI_STOCKS
         assert cotahist.parse_line(IBOV11) is None
@@ -73,6 +93,52 @@ class TestCotahist:
             z.writestr("COTAHIST_A2026.TXT", "\r\n".join([HEADER, PETR4, HGLG11]).encode("latin-1"))
         assert [q.ticker for q in cotahist.iter_quotes(path)] == ["PETR4", "HGLG11"]
         assert [q.ticker for q in cotahist.iter_quotes(path, {"hglg11"})] == ["HGLG11"]
+
+
+class TestListaDeEtfsDaB3:
+    PAGE = {
+        "page": {"pageNumber": 1, "pageSize": 120, "totalRecords": 2, "totalPages": 1},
+        "results": [
+            {
+                "id": 990,
+                "typeName": None,
+                "acronym": "BOVA",
+                "fundName": "ISHARES IBOVESPA CLASSE DE ÍNDICE - RESPONSABILIDADE LIMITADA",
+                "tradingName": "ISHARES  BOVA",
+            },
+            {"id": 1, "acronym": "", "fundName": "SEM RAIZ", "tradingName": "X"},
+        ],
+    }
+
+    def test_pagina_vira_raizes_com_nome_de_pregao(self):
+        etfs, pages = b3_funds.parse_page(self.PAGE, "ETF")
+        assert etfs == [b3_funds.ListedEtf("BOVA", "ETF", "ISHARES BOVA")]
+        assert pages == 1
+
+    def test_consulta_vai_em_base64_com_o_tipo_e_a_pagina(self):
+        body = json.loads(base64.b64decode(b3_funds.query("ETF-RF", 2)))
+        assert body == {"language": "pt-br", "typeFund": "ETF-RF", "pageNumber": 2, "pageSize": 120}
+
+    def test_percorre_tipos_e_paginas_e_recusa_lista_curta(self, monkeypatch):
+        seen = []
+
+        def handler(request):
+            body = json.loads(base64.b64decode(request.url.path.rsplit("/", 1)[1]))
+            seen.append((body["typeFund"], body["pageNumber"]))
+            n = body["pageNumber"]
+            kind = b3_funds.ETF_TYPES.index(body["typeFund"])
+            rows = [{"acronym": f"E{kind}{n:02d}", "tradingName": "x"}]
+            return httpx.Response(200, json={"page": {"totalPages": 2}, "results": rows})
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        monkeypatch.setattr(b3_funds, "MIN_EXPECTED", 3)
+        etfs = b3_funds.fetch_etfs(client)
+        assert seen[:2] == [("ETF", 1), ("ETF", 2)]
+        assert len(seen) == 2 * len(b3_funds.ETF_TYPES)
+        assert [e.root for e in etfs][:3] == ["E001", "E002", "E101"]
+        monkeypatch.setattr(b3_funds, "MIN_EXPECTED", 100)
+        with pytest.raises(ValueError, match="o serviço deve ter mudado"):
+            b3_funds.fetch_etfs(client)
 
 
 TESOURO_HEADER = (

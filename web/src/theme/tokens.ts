@@ -35,6 +35,7 @@ export const tokens = {
   assetClass: {
     acao: { label: "Ações", color: "#60a5fa" },
     fii: { label: "FIIs", color: "#f9d47e" },
+    etf: { label: "ETFs", color: "#f472b6" },
     renda_fixa: { label: "Renda fixa", color: "#34d399" },
     cripto: { label: "Cripto", color: "#a78bfa" },
     tesouro: { label: "Tesouro", color: "#f87171" },

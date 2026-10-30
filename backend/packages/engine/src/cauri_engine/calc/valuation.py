@@ -33,6 +33,7 @@ from cauri_engine.calc.positions import AssetBook
 _EXPECTED_LAG: dict[AssetClass, int] = {
     AssetClass.ACAO: 0,
     AssetClass.FII: 0,
+    AssetClass.ETF: 0,
     AssetClass.CRIPTO: 0,
     AssetClass.TESOURO: 1,
 }

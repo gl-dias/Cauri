@@ -4,7 +4,8 @@ Duas passadas por dia útil (horário de Brasília): 18h30 e 19h30. A segunda s�
 o que ficou faltando na primeira (fechamento ainda não disponível, fonte fora do ar).
 
 Fontes:
-  * ações e FIIs: brapi (fechamento do dia, conferido pelo horário da cotação);
+  * ações, FIIs e ETFs: brapi (fechamento do dia, conferido pelo horário da cotação; os
+    ETFs vão por último, para uma recusa de plano não travar as ações);
   * cripto: CoinGecko, preço em BRL e USD no momento da coleta (cripto não fecha);
   * Tesouro: CSV do Tesouro Transparente (o PU mais recente é o de D-1);
   * CDI, Selic e IPCA: SGS do Banco Central (últimos dias, para pegar o que saiu).
@@ -278,7 +279,7 @@ def run_daily(
     by_class: dict[str, list[TrackedAsset]] = {}
     for a in assets:
         by_class.setdefault(a.asset_class, []).append(a)
-    b3 = by_class.get("acao", []) + by_class.get("fii", [])
+    b3 = by_class.get("acao", []) + by_class.get("fii", []) + by_class.get("etf", [])
 
     steps: list[tuple[str, Callable[[Conn], SourceResult]]] = []
     if "brapi" in sources and b3:

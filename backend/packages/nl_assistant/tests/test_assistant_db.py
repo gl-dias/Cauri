@@ -283,6 +283,32 @@ def test_pergunta_de_corretora_traz_todas_e_exchange_so_em_cripto(user, as_user)
         assert kinds[btc_options[0]] == "exchange"
 
 
+def test_etf_resolve_pelo_ticker_e_provento_vira_rendimento(user, as_user, admin_url):
+    with admin_connection(admin_url) as conn:
+        conn.execute(
+            "insert into market.issuers (code, name) values ('TSTE', 'Etf Teste')"
+            " on conflict do nothing"
+        )
+        conn.execute(
+            "insert into market.assets (ticker, class, issuer_code, name)"
+            " values ('TSTE11', 'etf', 'TSTE', 'Etf Teste CI') on conflict (ticker) do nothing"
+        )
+    with as_user(user) as conn:
+        _, proposal = say(
+            conn,
+            user.id,
+            "comprei 3 TSTE11 a 100 pela corretora teste a"
+            " e recebi 5 reais de TSTE11 pela corretora teste a",
+        )
+        compra, provento = primaries(proposal)
+        assert (compra["status"], compra["ticker"], compra["draft"]["quantity"]) == (
+            "ok",
+            "TSTE11",
+            "3",
+        )
+        assert provento["draft"]["income_kind"] == "rendimento"
+
+
 def test_corretora_dita_na_frase(user, as_user):
     with as_user(user) as conn:
         _, proposal = say(

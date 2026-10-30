@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
@@ -19,10 +19,11 @@ from psycopg.types.json import Jsonb
 from cauri_ingest_market.sources import cotahist, tesouro
 from cauri_storage import Conn
 
-# Ações (inclusive units) e FIIs: raiz de 4 caracteres + 1 ou 2 dígitos. BDRs e ETFs
-# já ficam de fora pelo código BDI (ver sources/cotahist.py).
+# Ações (inclusive units), FIIs e ETFs: raiz de 4 caracteres + 1 ou 2 dígitos. BDRs já
+# ficam de fora pelo código BDI (ver sources/cotahist.py).
 _B3_TICKER = re.compile(r"^[A-Z0-9]{4}\d{1,2}$")
 _ACTIVE_WINDOW = timedelta(days=30)
+_B3_CLASSES = {cotahist.BDI_REITS: "fii", cotahist.BDI_FUNDS: "etf"}
 
 
 def normalize_alias(text: str) -> str:
@@ -112,12 +113,18 @@ class AssetSyncReport:
     inactive: int
 
 
-def sync_b3_assets(conn: Conn, zip_path: Path) -> AssetSyncReport:
-    """Ações e FIIs a partir do COTAHIST: último registro de cada ticker define nome e se
-    ainda negocia (negociou nos últimos 30 dias do arquivo)."""
+def sync_b3_assets(conn: Conn, zip_path: Path, etf_roots: Collection[str] = ()) -> AssetSyncReport:
+    """Ações, FIIs e ETFs a partir do COTAHIST: último registro de cada ticker define nome e
+    se ainda negocia (negociou nos últimos 30 dias do arquivo).
+
+    No BDI de fundos (14) só entram os ETFs, pela raiz (``etf_roots``, da lista da B3 em
+    ``reference/etfs.yaml``); FI-Infra e Fiagro ficam de fora."""
+    roots = {r.upper() for r in etf_roots}
     latest: dict[str, cotahist.CotahistQuote] = {}
     for quote in cotahist.iter_quotes(zip_path):
         if not _B3_TICKER.match(quote.ticker):
+            continue
+        if quote.bdi == cotahist.BDI_FUNDS and quote.ticker[:4] not in roots:
             continue
         current = latest.get(quote.ticker)
         if current is None or quote.trade_date >= current.trade_date:
@@ -140,7 +147,7 @@ def sync_b3_assets(conn: Conn, zip_path: Path) -> AssetSyncReport:
         for ticker, q in sorted(latest.items()):
             active = last_day - q.trade_date <= _ACTIVE_WINDOW
             inactive += not active
-            asset_class = "fii" if q.bdi == cotahist.BDI_REITS else "acao"
+            asset_class = _B3_CLASSES.get(q.bdi, "acao")
             name = f"{q.short_name.title()} {q.spec}".strip()
             rows.append(
                 (
