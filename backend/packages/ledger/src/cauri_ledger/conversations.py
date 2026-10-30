@@ -202,6 +202,28 @@ class ConversationStore:
         ).fetchall()
         return [_proposal(r) for r in rows]
 
+    def open_proposal(self, user_id: UUID, conversation_id: UUID) -> StoredProposal | None:
+        """O cartão pendente mais recente da conversa, se houver."""
+        pending = [p for p in self.proposals_of(user_id, conversation_id) if p.status == "pending"]
+        return pending[-1] if pending else None
+
+    def recent_user_texts(self, user_id: UUID, conversation_id: UUID, limit: int) -> list[str]:
+        """As últimas frases do usuário na conversa, da mais antiga para a mais nova."""
+        rows = self._conn.execute(
+            "select content from assistant.messages"
+            " where user_id = %s and conversation_id = %s and role = 'user'"
+            " order by created_at desc, id desc limit %s",
+            [user_id, conversation_id, limit],
+        ).fetchall()
+        return [r["content"] for r in reversed(rows)]
+
+    def move_proposal(self, user_id: UUID, proposal_id: UUID, message_id: UUID) -> None:
+        """Leva o cartão para outra mensagem (a resposta mais recente da conversa)."""
+        self._conn.execute(
+            "update assistant.proposals set message_id = %s where user_id = %s and id = %s",
+            [message_id, user_id, proposal_id],
+        )
+
     def save_proposal(
         self,
         user_id: UUID,

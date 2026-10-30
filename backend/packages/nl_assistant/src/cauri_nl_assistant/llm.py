@@ -1,11 +1,13 @@
 """Extração pela API da Anthropic (Haiku), com saída estruturada por ferramenta obrigatória.
 
-O pedido leva só o texto do usuário e a data de hoje. Nada da carteira, nada de ticker
-que o usuário tenha: o modelo devolve o que foi falado e o Python resolve o resto.
+O pedido leva só o que o usuário escreveu (a frase e, com cartão aberto, as frases
+anteriores da conversa) e a data de hoje. Nada da carteira, nada de ticker que o usuário
+tenha: o modelo devolve o que foi falado e o Python resolve o resto.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from typing import Any
 
@@ -15,6 +17,7 @@ from cauri_nl_assistant.extraction import (
     SYSTEM,
     TOOL,
     TOOL_NAME,
+    Complement,
     Extraction,
     ExtractionError,
     SpokenOp,
@@ -44,18 +47,18 @@ class AnthropicExtractor:
     def model(self) -> str:
         return self._model
 
-    def request_body(self, text: str, today: date) -> dict[str, Any]:
+    def request_body(self, text: str, today: date, context: Sequence[str] = ()) -> dict[str, Any]:
         return {
             "model": self._model,
             "max_tokens": 1024,
             "system": SYSTEM.format(tool=TOOL_NAME, today=today.isoformat()),
-            "messages": [{"role": "user", "content": text}],
+            "messages": [{"role": "user", "content": user_content(text, context)}],
             "tools": [TOOL],
             "tool_choice": {"type": "tool", "name": TOOL_NAME},
         }
 
-    def extract(self, text: str, today: date) -> Extraction:
-        body = self.request_body(text, today)
+    def extract(self, text: str, today: date, context: Sequence[str] = ()) -> Extraction:
+        body = self.request_body(text, today, context)
         headers = {
             "x-api-key": self._key,
             "anthropic-version": API_VERSION,
@@ -75,11 +78,23 @@ class AnthropicExtractor:
         return parse_response(response.json(), self._model)
 
 
+def user_content(text: str, context: Sequence[str]) -> str:
+    """A frase sozinha; com cartão aberto, antes dela as frases anteriores do usuário."""
+    if not context:
+        return text
+    before = "\n".join(f"- {c}" for c in context)
+    return (
+        "Frases anteriores desta conversa (o cartão continua aberto):\n"
+        f"{before}\n\nFrase nova: {text}"
+    )
+
+
 def parse_response(data: dict[str, Any], model: str) -> Extraction:
     blocks = [b for b in data.get("content", []) if b.get("type") == "tool_use"]
     if not blocks:
         raise ExtractionError("Não entendi a frase. Tente de novo com outras palavras.")
-    raw_ops = blocks[0].get("input", {}).get("operacoes", [])
+    tool_input = blocks[0].get("input") or {}
+    raw_ops = tool_input.get("operacoes", [])
     if not isinstance(raw_ops, list):
         raise ExtractionError("Não entendi a frase. Tente de novo com outras palavras.")
     ops = tuple(
@@ -93,4 +108,5 @@ def parse_response(data: dict[str, Any], model: str) -> Extraction:
         model=model,
         input_tokens=int(usage.get("input_tokens") or 0),
         output_tokens=int(usage.get("output_tokens") or 0),
+        complement=None if ops else Complement.from_json(tool_input.get("complemento")),
     )

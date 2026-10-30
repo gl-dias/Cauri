@@ -52,8 +52,9 @@ As quatro primeiras têm ADR completo em [`docs/adr/`](docs/adr/).
 4. **[API numa VPS com Dockerfile portável.](docs/adr/0004-api-na-vps-com-dockerfile-portavel.md)**
    Sem custo a mais (a VPS já roda outros serviços), e a mesma imagem sobe no Cloud Run se
    precisar.
-5. **O LLM nunca vê a carteira.** O Claude Haiku recebe só a frase e a data de hoje e devolve
-   seis campos por saída estruturada. Achar o ticker, resolver ambiguidade, sugerir preço e
+5. **O LLM nunca vê a carteira.** O Claude Haiku recebe só o que a pessoa escreveu (com um
+   cartão aberto, também as frases anteriores da conversa) e a data de hoje, e devolve os
+   campos por saída estruturada. Achar o ticker, resolver ambiguidade, sugerir preço e
    conferir saldo é Python determinístico e testado. O uso tem limite diário por pessoa, e
    os tokens de cada chamada aparecem no painel de admin.
 6. **Importação idempotente e transparente.** Cada linha vira uma chave pelo conteúdo e pela

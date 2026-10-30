@@ -283,6 +283,81 @@ def test_pergunta_de_corretora_traz_todas_e_exchange_so_em_cripto(user, as_user)
         assert kinds[btc_options[0]] == "exchange"
 
 
+def test_corretora_dita_na_frase(user, as_user):
+    with as_user(user) as conn:
+        _, proposal = say(
+            conn, user.id, "comprei 2 PETR4 a 30 pela corretora teste a e comprei 1 PETR4 na zz"
+        )
+        dita, desconhecida = primaries(proposal)
+        assert (dita["status"], dita["draft"]["broker_id"]) == ("ok", BROKER)
+        assert desconhecida["status"] == "pergunta"
+        assert desconhecida["question"]["text"] == 'Não achei a corretora "zz". Qual delas?'
+
+
+class RecordingExtractor:
+    model = "regras"
+
+    def __init__(self):
+        self.contexts = []
+
+    def extract(self, text, today, context=()):
+        self.contexts.append(list(context))
+        return assistant.RuleExtractor().extract(text, today, context)
+
+
+def test_frase_de_seguimento_completa_o_cartao_aberto(user, as_user):
+    extractor = RecordingExtractor()
+    with as_user(user) as conn:
+        ledger = Ledger(conn, today=TODAY)
+
+        def send(text, conversation=None):
+            reply = assistant.send(
+                ledger, user.id, text, extractor=extractor, today=TODAY,
+                conversation_id=conversation,
+            )  # fmt: skip
+            found = ledger.conversations.proposal(user.id, reply.proposal_id)
+            return reply, found
+
+        first, card = send("comprei 2 PETR4 a 30")
+        assert primaries(card)[0]["question"]["field"] == "broker_id"
+        chat = first.conversation_id
+
+        lost, _ = send("bom dia", chat)
+        assert lost.proposal_id is None
+        assert lost.text.startswith("Não entendi o que mudar no cartão.")
+
+        follow, updated = send("dia 9 pela corretora teste a", chat)
+        assert extractor.contexts == [
+            [],
+            ["comprei 2 PETR4 a 30"],
+            ["comprei 2 PETR4 a 30", "bom dia"],
+        ]
+        assert follow.proposal_id == card.id
+        assert follow.text == "Atualizei o cartão (data e corretora). Confira o cartão e confirme."
+        [item] = primaries(updated)
+        assert item["status"] == "ok"
+        assert (item["draft"]["broker_id"], item["draft"]["trade_date"]) == (BROKER, "2011-03-09")
+        # O cartão desce para a resposta mais recente; a conversa mostra um cartão só.
+        assert updated.message_id == follow.assistant_message_id
+        assert len(ledger.conversations.proposals_of(user.id, chat)) == 1
+
+        assistant.confirm(ledger, user.id, card.id, today=TODAY)
+        _, other = send("comprei 1 PETR4 a 31", chat)
+        assert extractor.contexts[-1] == []  # sem cartão aberto, a frase vai sozinha
+        assert other.id != card.id
+
+
+def test_seguimento_com_dois_itens_pendentes_so_vale_para_corretora(user, as_user):
+    with as_user(user) as conn:
+        first, _ = say(conn, user.id, "comprei 2 PETR4 a 30 e comprei 1 ITUB4 a 20")
+        chat = first.conversation_id
+        reply, _ = say(conn, user.id, "dia 9", conversation_id=chat)
+        assert reply.proposal_id is None
+        assert "mais de uma operação pendente" in reply.text
+        reply, updated = say(conn, user.id, "na corretora teste a", conversation_id=chat)
+        assert {i["draft"]["broker_id"] for i in primaries(updated)} == {BROKER}
+
+
 def test_frase_sem_operacao_e_conversa_de_outro_usuario(user, make_user, as_user):
     with as_user(user) as conn:
         reply, proposal = say(conn, user.id, "bom dia")
@@ -292,7 +367,7 @@ def test_frase_sem_operacao_e_conversa_de_outro_usuario(user, make_user, as_user
             "select llm_output from assistant.messages where user_id = %s and role = 'user'",
             [user.id],
         ).fetchone()
-        assert stored["llm_output"] == {"operacoes": []}
+        assert stored["llm_output"] == {"operacoes": [], "complemento": None}
         _, proposal = say(conn, user.id, "comprei 1 PETR4 a 30")
     other = make_user()
     with as_user(other) as conn:
@@ -304,15 +379,15 @@ def test_frase_sem_operacao_e_conversa_de_outro_usuario(user, make_user, as_user
 class BrokenExtractor:
     model = "claude-haiku-5-5"
 
-    def extract(self, text, today):
+    def extract(self, text, today, context=()):
         raise assistant.ExtractionError("O assistente não respondeu agora. Tente de novo.")
 
 
 class CountingExtractor:
     model = "claude-haiku-5-5"
 
-    def extract(self, text, today):
-        result = assistant.RuleExtractor().extract(text, today)
+    def extract(self, text, today, context=()):
+        result = assistant.RuleExtractor().extract(text, today, context)
         return assistant.Extraction(result.ops, self.model, input_tokens=812, output_tokens=95)
 
 

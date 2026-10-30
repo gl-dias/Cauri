@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -21,6 +22,8 @@ from cauri_core import AssetClass
 from cauri_ledger import CatalogAsset, Ledger
 
 _TICKER = re.compile(r"^[A-Z0-9]{2,12}$|^TD-[A-Z-]+-\d{8}$")
+_BROKER_PREFIX = re.compile(r"^(?:na|no|pela|pelo)\s+")
+_BROKER_FILLER = frozenset({"banco", "bank", "investimentos", "do", "da", "de"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +50,23 @@ Resolution = Resolved | Ask | NotFound
 def normalize(text: str) -> str:
     stripped = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     return " ".join(stripped.lower().split())
+
+
+def match_broker(brokers: Mapping[str, str], spoken: str) -> str | None:
+    """Corretora como falada ("xp", "na inter", "banco do brasil") para o id, se só uma bate.
+
+    Vale o id ou o nome inteiro; senão, uma palavra própria do nome ("pactual" é o BTG).
+    """
+    norm = _BROKER_PREFIX.sub("", normalize(spoken))
+    if not norm:
+        return None
+    exact = [b for b, name in brokers.items() if norm in (normalize(b), normalize(name))]
+    if exact:
+        return exact[0] if len(exact) == 1 else None
+    by_word = [
+        b for b, name in brokers.items() if norm in set(normalize(name).split()) - _BROKER_FILLER
+    ]
+    return by_word[0] if len(by_word) == 1 else None
 
 
 class Resolver:

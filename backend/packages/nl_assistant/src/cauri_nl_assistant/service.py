@@ -1,9 +1,13 @@
 """Da frase ao cartão de confirmação, e do cartão ao ledger.
 
 ``send`` guarda a mensagem, pede ao extrator os campos da frase, resolve cada ativo e monta
-o cartão. Cada item vira um rascunho do ledger e passa pela mesma conferência da importação
-e do lançamento manual (``ledger.check``): erros, duplicados prováveis e venda descoberta,
-que vira oferta de saldo inicial. Nada é gravado até ``confirm``.
+o cartão. Com um cartão aberto na conversa, o extrator também recebe as frases anteriores
+do usuário, e uma frase que só completa o cartão ("na XP, dia 29") muda aquele cartão, que
+desce para a resposta mais recente: a conversa segue de onde parou.
+
+Cada item vira um rascunho do ledger e passa pela mesma conferência da importação e do
+lançamento manual (``ledger.check``): erros, duplicados prováveis e venda descoberta, que
+vira oferta de saldo inicial. Nada é gravado até ``confirm``.
 
 Os itens guardam o que foi falado e as escolhas do usuário (respostas e edições); o resto
 é recalculado a cada passo por ``_rebuild``, então o cartão nunca fica inconsistente.
@@ -30,8 +34,14 @@ from cauri_ledger import (
     fx,
     opening,
 )
-from cauri_nl_assistant.extraction import Extraction, ExtractionError, Extractor, SpokenOp
-from cauri_nl_assistant.resolver import Ask, NotFound, Resolved, Resolver, normalize
+from cauri_nl_assistant.extraction import (
+    Complement,
+    Extraction,
+    ExtractionError,
+    Extractor,
+    SpokenOp,
+)
+from cauri_nl_assistant.resolver import Ask, NotFound, Resolved, Resolver, match_broker, normalize
 
 # Moedas que não são posição: pagar com elas não gera contrapartida (como na importação).
 NOT_POSITIONS = frozenset({"BRL", "USD"})
@@ -50,6 +60,23 @@ _UNSUPPORTED = (
 
 MAX_TEXT = 500  # caracteres por frase: o bastante para algumas operações, barato no Haiku
 DEFAULT_DAILY_LIMIT = 50
+CONTEXT_PHRASES = 3  # frases anteriores que vão junto quando há cartão aberto
+_NO_OPERATION = (
+    "Não encontrei nenhuma operação nessa frase. Tente assim: "
+    '"comprei 10 PETR4 a 38,50 ontem" ou "recebi 50 reais de dividendos de itau".'
+)
+_NO_OPERATION_WITH_CARD = (
+    "Não entendi o que mudar no cartão. Diga só o que falta, como "
+    '"na XP" ou "foi dia 29", ou responda direto no cartão.'
+)
+_FIELD_NAMES = {
+    "ativo": "ativo",
+    "quantidade": "quantidade",
+    "preco": "preço",
+    "moeda": "moeda",
+    "data": "data",
+    "corretora": "corretora",
+}
 
 
 class AssistantError(Exception):
@@ -104,16 +131,21 @@ def send(
             f"Você chegou ao limite de {daily_limit} mensagens por hoje. Amanhã libera de novo; "
             "até lá, dá para lançar à mão ou importar uma planilha."
         )
+    card: StoredProposal | None = None
     if conversation_id is None:
         conversation_id = store.create(user_id, text[:60])
     elif not store.exists(user_id, conversation_id):
         raise AssistantError("Conversa não encontrada.")
+    else:
+        card = store.open_proposal(user_id, conversation_id)
+    context = store.recent_user_texts(user_id, conversation_id, CONTEXT_PHRASES) if card else []
 
-    # O extrator recebe só o texto e a data de hoje. Cada chamada fica registrada (tokens),
-    # inclusive a que falhou: é ela que conta para o limite e para o custo.
+    # O extrator recebe só o que o usuário escreveu (e as frases anteriores, com cartão
+    # aberto) e a data de hoje. Cada chamada fica registrada (tokens), inclusive a que
+    # falhou: é ela que conta para o limite e para o custo.
     provider = "regras" if extractor.model == "regras" else "anthropic"
     try:
-        extraction = extract_safely(extractor, text, today)
+        extraction = extract_safely(extractor, text, today, context)
     except ExtractionError as exc:
         store.record_usage(
             user_id, provider=provider, kind="mensagem", model=extractor.model, ok=False, day=today
@@ -143,10 +175,11 @@ def send(
         llm_output=extraction.to_json(),
     )
     if not extraction.ops:
-        reply = (
-            "Não encontrei nenhuma operação nessa frase. Tente assim: "
-            '"comprei 10 PETR4 a 38,50 ontem" ou "recebi 50 reais de dividendos de itau".'
-        )
+        if card is not None and extraction.complement is not None:
+            return _complete(
+                ledger, user_id, conversation_id, user_message, card, extraction.complement, today
+            )
+        reply = _NO_OPERATION if card is None else _NO_OPERATION_WITH_CARD
         message = store.add_message(user_id, conversation_id, "assistant", reply)
         return Reply(conversation_id, user_message, message, reply, None)
 
@@ -162,13 +195,72 @@ def send(
     return Reply(conversation_id, user_message, message, reply, proposal_id)
 
 
-def extract_safely(extractor: Extractor, text: str, today: date) -> Extraction:
+def extract_safely(
+    extractor: Extractor, text: str, today: date, context: Sequence[str] = ()
+) -> Extraction:
     try:
-        return extractor.extract(text, today)
+        return extractor.extract(text, today, context)
     except ExtractionError:
         raise
     except Exception as exc:  # erro inesperado do provedor vira mensagem amigável
         raise ExtractionError("O assistente não respondeu agora. Tente de novo.") from exc
+
+
+def _complete(
+    ledger: Ledger,
+    user_id: UUID,
+    conversation_id: UUID,
+    user_message: UUID,
+    card: StoredProposal,
+    complement: Complement,
+    today: date,
+) -> Reply:
+    """Frase de seguimento: muda o cartão aberto e o traz para a resposta mais recente."""
+    store = ledger.conversations
+    primaries = [
+        {**dict(i), "choices": dict(i.get("choices") or {})}
+        for i in card.items
+        if i.get("kind") != "contrapartida"
+    ]
+    waiting = [i for i in primaries if i["status"] in {"pergunta", "erro"}] or primaries
+    # A corretora vale para todos os itens pendentes; o resto, só quando há um item só.
+    if complement.said == ("corretora",) or len(waiting) == 1:
+        targets = waiting
+    else:
+        reply = "Tem mais de uma operação pendente no cartão. Responda direto nele, item por item."
+        message = store.add_message(user_id, conversation_id, "assistant", reply)
+        return Reply(conversation_id, user_message, message, reply, None)
+
+    broker = match_broker(ledger.brokers(), complement.corretora) if complement.corretora else None
+    for item in targets:
+        _apply_complement(item, complement, broker)
+    proposal = _save(ledger, user_id, card, primaries, today)
+
+    changed = [_FIELD_NAMES[k] for k in complement.said if k != "corretora" or broker]
+    parts = [f"Atualizei o cartão ({_join(changed)})."] if changed else []
+    if complement.corretora and broker is None:
+        parts.append(f'Não achei a corretora "{complement.corretora}": escolha no cartão.')
+    parts.append(_status(proposal.items))
+    reply = " ".join(parts)
+    message = store.add_message(user_id, conversation_id, "assistant", reply)
+    store.move_proposal(user_id, card.id, message)
+    return Reply(conversation_id, user_message, message, reply, card.id)
+
+
+def _apply_complement(item: dict[str, Any], complement: Complement, broker: str | None) -> None:
+    spoken = dict(item["spoken"])
+    for key, value in complement.to_json().items():
+        if value is not None:
+            spoken[key] = value
+    item["spoken"] = SpokenOp.from_json(spoken).to_json()
+    if complement.ativo:
+        item["choices"].pop("ticker", None)
+    if complement.preco is not None:
+        item["choices"].pop("price_from_close", None)
+    if broker:
+        item["choices"]["broker_id"] = broker
+    elif complement.corretora:
+        item["choices"].pop("broker_id", None)  # o cartão pergunta de novo
 
 
 # Ações do cartão -----------------------------------------------------------------------
@@ -402,7 +494,18 @@ def _build(
     if op.data is None:
         messages.append({"level": "info", "text": "Sem data na frase: vale hoje."})
 
-    broker = choices.get("broker_id") or _broker_for(ledger, user_id, resolution, asset_class)
+    broker = choices.get("broker_id")
+    if broker is None and op.corretora:
+        broker = match_broker(ledger.brokers(), op.corretora)
+        if broker is None:
+            item["status"] = "pergunta"
+            item["question"] = {
+                "field": "broker_id",
+                "text": f'Não achei a corretora "{op.corretora}". Qual delas?',
+                "options": _broker_options(ledger, asset_class),
+            }
+            return [item]
+    broker = broker or _broker_for(ledger, user_id, resolution, asset_class)
     if broker is None:
         item["status"] = "pergunta"
         item["question"] = {
@@ -611,16 +714,21 @@ def _apply_check(item: dict[str, Any], check: DraftCheck) -> None:
 
 
 def _summary(items: Sequence[Mapping[str, Any]]) -> str:
-    primaries = [i for i in items if i.get("kind") != "contrapartida"]
-    count = len(primaries)
+    count = sum(i.get("kind") != "contrapartida" for i in items)
     head = "Entendi 1 operação." if count == 1 else f"Entendi {count} operações."
-    questions = [i for i in primaries if i["status"] == "pergunta"]
-    errors = [i for i in items if i["status"] == "erro"]
-    if questions:
-        return f"{head} Antes de gravar, preciso de uma resposta no cartão."
-    if errors:
-        return f"{head} Tem pendência no cartão: confira antes de confirmar."
-    return f"{head} Confira o cartão e confirme."
+    return f"{head} {_status(items)}"
+
+
+def _status(items: Sequence[Mapping[str, Any]]) -> str:
+    if any(i["status"] == "pergunta" for i in items):
+        return "Antes de gravar, preciso de uma resposta no cartão."
+    if any(i["status"] == "erro" for i in items):
+        return "Tem pendência no cartão: confira antes de confirmar."
+    return "Confira o cartão e confirme."
+
+
+def _join(items: Sequence[str]) -> str:
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} e {items[-1]}"
 
 
 def _update(

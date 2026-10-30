@@ -15,7 +15,7 @@ from cauri_nl_assistant import (
     SpokenOp,
     TranscriptionError,
 )
-from cauri_nl_assistant.extraction import TOOL_NAME
+from cauri_nl_assistant.extraction import TOOL_NAME, Complement
 
 TODAY = date(2011, 3, 10)
 
@@ -60,6 +60,25 @@ class TestRegras:
 
     def test_frase_sem_operacao(self):
         assert extract("bom dia, como vai a carteira?") == ()
+
+    def test_corretora_e_dia_do_mes(self):
+        [op] = extract("comprei 10 PETR4 a 30 dia 9 na xp")
+        assert (op.ativo, op.preco, op.data, op.corretora) == (
+            "petr4",
+            Decimal(30),
+            date(2011, 3, 9),
+            "xp",
+        )
+
+    def test_seguimento_vira_complemento_so_com_cartao_aberto(self):
+        rules = RuleExtractor()
+        assert rules.extract("xp no dia 9", TODAY).complement is None
+        before = ["comprei 1 PETR4 a 30"]
+        assert rules.extract("xp no dia 9", TODAY, before).complement == Complement(
+            data=date(2011, 3, 9), corretora="xp"
+        )
+        assert rules.extract("ibov11", TODAY, before).complement == Complement(ativo="ibov11")
+        assert rules.extract("bom dia", TODAY, before).complement is None
 
 
 def anthropic_response(ops):
@@ -124,6 +143,39 @@ class TestHaiku:
         assert result.ops[1].quantidade == Decimal(2)
         assert result.ops[1].data == date(2011, 3, 9)
         assert isinstance(result.ops[0].quantidade, Decimal)
+
+    def test_cartao_aberto_leva_as_frases_anteriores_e_le_o_complemento(self):
+        seen = {}
+        said = {
+            "operacoes": [],
+            "complemento": {
+                "ativo": None,
+                "quantidade": None,
+                "preco": None,
+                "moeda": None,
+                "data": "2011-03-09",
+                "corretora": "XP",
+            },
+        }
+
+        def handler(request):
+            seen["body"] = json.loads(request.content)
+            return httpx.Response(
+                200, json={"content": [{"type": "tool_use", "name": TOOL_NAME, "input": said}]}
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        result = AnthropicExtractor("k", client=client).extract(
+            "Xp no dia 9", TODAY, ["comprei um IBOV11 hoje por 168"]
+        )
+        [message] = seen["body"]["messages"]
+        assert message["content"] == (
+            "Frases anteriores desta conversa (o cartão continua aberto):\n"
+            "- comprei um IBOV11 hoje por 168\n\nFrase nova: Xp no dia 9"
+        )
+        assert result.ops == ()
+        assert result.complement == Complement(data=date(2011, 3, 9), corretora="XP")
+        assert result.to_json()["complemento"]["corretora"] == "XP"
 
     def test_sobrecarga_tenta_de_novo_uma_vez(self):
         calls = []

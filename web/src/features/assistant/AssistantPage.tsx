@@ -86,7 +86,12 @@ function Chat({ app }: { app: AppSource }) {
     mutationFn: ({ text, mode }: { text: string; mode: "texto" | "voz" }) => app.api.assistant.send(text, activeId, mode),
     onSuccess: async (result) => {
       setActiveId(result.conversation_id);
-      setMessages((m) => [...m, ...result.messages]);
+      // Uma frase de seguimento traz o cartão aberto para a resposta nova: sai da antiga.
+      const moved = new Set(result.messages.flatMap((m) => (m.proposal ? [m.proposal.id] : [])));
+      setMessages((list) => [
+        ...list.map((m) => (m.proposal && moved.has(m.proposal.id) ? { ...m, proposal: null } : m)),
+        ...result.messages,
+      ]);
       await client.invalidateQueries({ queryKey: ["app", "conversations"] });
     },
   });
@@ -100,6 +105,7 @@ function Chat({ app }: { app: AppSource }) {
   }, [activeId, load, refresh]);
 
   const unavailable = config.data?.llm === "indisponivel";
+  const waiting = messages.some((m) => m.proposal?.status === "pending" && m.proposal.items.some((i) => i.status === "pergunta" || i.status === "erro"));
   return (
     <Layout
       conversations={conversations.data ?? []}
@@ -128,7 +134,7 @@ function Chat({ app }: { app: AppSource }) {
             <Composer
               disabled={unavailable || send.isPending}
               busy={send.isPending}
-              hint={unavailable ? "Assistente sem chave da Anthropic no servidor" : undefined}
+              hint={unavailable ? "Assistente sem chave da Anthropic no servidor" : waiting ? "Complete o cartão: na XP, foi dia 29..." : undefined}
               onSend={(text, mode) => send.mutate({ text, mode })}
               voiceMode={config.data?.voice}
               transcribe={(audio) => app.api.assistant.transcribe(audio).then((r) => r.text)}

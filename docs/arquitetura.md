@@ -654,16 +654,24 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
 
 - **O LLM só extrai a frase.** Haiku (`claude-haiku-5-5`, configurável) com saída
   estruturada por ferramenta obrigatória, devolvendo para cada operação {tipo, ativo como
-  falado, quantidade, preço, moeda, data}, com números como texto decimal (nunca float). O
-  pedido leva só a frase e a data de hoje: nada da carteira. Uma nova tentativa em
-  sobrecarga, nunca mais que isso.
+  falado, quantidade, preço, moeda, data, corretora como falada}, com números como texto
+  decimal (nunca float). O pedido leva só o que o usuário escreveu e a data de hoje: nada da
+  carteira. Uma nova tentativa em sobrecarga, nunca mais que isso.
+- **Conversa com continuidade:** com um cartão aberto (pendente) na conversa, o pedido leva
+  também as últimas três frases do usuário, e o modelo pode devolver um `complemento` em vez
+  de operação nova ("na XP, dia 29", "era IBOV11", "foi a 38,50"). O Python aplica o
+  complemento no item pendente (a corretora vale para todos os pendentes; os outros campos,
+  só quando há um item pendente) e o cartão desce para a resposta mais recente. As perguntas
+  do cartão nunca vão para o modelo (elas citam o que o usuário tem).
 - **Resolução em Python determinístico:** ticker escrito vale direto; apelido aponta para
   um emissor ou um ativo ("itau" é ITUB e "itausa" é ITSA, nunca se misturam); emissor com
   mais de um ticker usa o único que o usuário tem, e pergunta se ele tem os dois ou nenhum.
   Empresa com um ticker só não pergunta (não há ambiguidade). Tesouro pelo nome do título.
 - **Campos que faltam:** data vira hoje (o cartão avisa); preço vira o fechamento mais recente,
-  marcado como sugestão; corretora vira a única onde o ativo está, ou a mais recente da
-  classe, editável no cartão.
+  marcado como sugestão; corretora vira a dita na frase (pelo id, pelo nome ou por uma palavra
+  própria do nome), senão a única onde o ativo está, ou a mais recente da classe, editável no
+  cartão. Sem nenhuma, o cartão pergunta com todas as opções da classe (exchange só em
+  cripto).
 - **Moeda estrangeira e cripto como na importação:** "a 120 mil dólares" converte pela PTAX de
   venda do dia; pagar com USDT (ou outra cripto) gera a contrapartida no saldo dela.
 - **O cartão usa o mesmo `ledger.check`** do lançamento manual e da importação: erros,

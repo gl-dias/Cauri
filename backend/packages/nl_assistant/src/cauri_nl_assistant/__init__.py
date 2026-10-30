@@ -7,11 +7,19 @@ Contrato::
     assistant.answer(ledger, user_id, proposal_id, item_id, "ticker", "PETR4", today=hoje)
     assistant.confirm(ledger, user_id, proposal_id, today=hoje)
 
-O extrator (Haiku) recebe só a frase e a data de hoje. Resolução de ticker, ambiguidade,
-preço sugerido, conversão de moeda e conferência no ledger são Python determinístico.
+O extrator (Haiku) recebe só o que o usuário escreveu (a frase e, com cartão aberto, as
+frases anteriores da conversa) e a data de hoje. Resolução de ticker e de corretora,
+ambiguidade, preço sugerido, conversão de moeda e conferência no ledger são Python
+determinístico.
 """
 
-from cauri_nl_assistant.extraction import Extraction, ExtractionError, Extractor, SpokenOp
+from cauri_nl_assistant.extraction import (
+    Complement,
+    Extraction,
+    ExtractionError,
+    Extractor,
+    SpokenOp,
+)
 from cauri_nl_assistant.llm import DEFAULT_MODEL, AnthropicExtractor
 from cauri_nl_assistant.resolver import Ask, NotFound, Resolved, Resolver
 from cauri_nl_assistant.rules import RuleExtractor
@@ -40,6 +48,7 @@ __all__ = [
     "AnthropicExtractor",
     "Ask",
     "AssistantError",
+    "Complement",
     "Extraction",
     "ExtractionError",
     "Extractor",
