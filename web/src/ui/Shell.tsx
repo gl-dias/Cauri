@@ -19,6 +19,7 @@ import { BACKGROUNDS, type BackgroundSlug } from "@/theme/backgrounds";
 import { tokens } from "@/theme/tokens";
 
 import { Background } from "./Background";
+import { Brand } from "./Brand";
 import { IconButton } from "./controls";
 import { Avatar } from "./viz";
 
@@ -40,16 +41,7 @@ export function navItems(base: string, { admin = false }: { admin?: boolean } = 
 function Logo({ demo }: { demo: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span
-        className="grid size-10 place-items-center rounded-[14px] shadow-card"
-        style={{ background: "linear-gradient(135deg, var(--cauri-avatar-from), var(--cauri-avatar-to))" }}
-        aria-hidden
-      >
-        <svg viewBox="0 0 64 64" className="size-6">
-          <path d="M42 22a14 14 0 1 0 0 20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" />
-        </svg>
-      </span>
-      <span className="text-[18px] font-semibold tracking-tight">Cauri</span>
+      <Brand />
       {demo ? (
         <span className="rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-ink uppercase">
           Demo

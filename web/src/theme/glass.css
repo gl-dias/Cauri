@@ -4,6 +4,7 @@
    o Tailwind e se define o vidro. Nenhum valor de cor mora neste arquivo. */
 @theme inline {
   --font-sans: var(--cauri-font-sans);
+  --font-brand: var(--cauri-font-brand);
   --color-ink: var(--cauri-text);
   --color-muted: var(--cauri-text-muted);
   --color-subtle: var(--cauri-text-subtle);

@@ -1,4 +1,4 @@
-# Cauri
+# <img src="docs/marca/09-selo.svg" width="40" alt="" align="top"> Cauri
 
 Carteira de investimentos que junta ações, FIIs, ETFs, Tesouro Direto, renda fixa e cripto num lugar só e compara a rentabilidade com o CDI.
 As operações entram pela planilha da corretora ou por uma frase falada ("comprei 3 petrobras"), e nada é gravado sem você conferir antes.

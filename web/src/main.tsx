@@ -1,4 +1,5 @@
 import "@fontsource-variable/inter";
+import "@fontsource/instrument-serif/latin-400.css";
 import "./theme/glass.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

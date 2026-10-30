@@ -24,8 +24,8 @@ export const tokens = {
     primary: "#2563eb", // blue-600: ação primária (branco sobre blue-500 não passa no AA)
     primaryHover: "#1d4ed8",
     gold: "#f9d47e",
-    avatarFrom: "#fdba74",
-    avatarTo: "#f97316",
+    avatarFrom: "#f3ead8", // creme do papel do selo (ver ui/Brand.tsx)
+    avatarTo: "#dcc5a0",
     onLight: "#111111",
     chartBar: "rgba(255, 255, 255, 0.22)",
     chartBarActive: "#60a5fa",
@@ -64,6 +64,7 @@ export const tokens = {
   },
   font: {
     sans: "'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    brand: "'Instrument Serif', Georgia, 'Times New Roman', serif", // só no nome Cauri
   },
   motion: {
     stagger: 0.04,
@@ -104,6 +105,7 @@ const cssVars: Record<string, string> = {
   "--cauri-shadow-card": tokens.shadow.card,
   "--cauri-shadow-lifted": tokens.shadow.lifted,
   "--cauri-font-sans": tokens.font.sans,
+  "--cauri-font-brand": tokens.font.brand,
   "--cauri-overlay-from": tokens.background.overlayFrom,
   "--cauri-overlay-to": tokens.background.overlayTo,
   ...Object.fromEntries(
