@@ -34,7 +34,8 @@ Para trocar de logo, mudar estes lugares juntos:
 - `web/public/favicon.svg`: a aba do navegador (versão simplificada, sem o anel e os dentes,
   para ler bem em 16 e 32 px);
 - `web/public/apple-touch-icon.png` e `icon-*.png`: o ícone da tela de início do celular
-  (o iPhone não usa o SVG), gerados de `09-selo.svg` por `node scripts/icons.mjs` em `web/`;
+  (o iPhone não usa o SVG), gerados de `09-selo.svg` por `node scripts/icons.mjs` em `web/`.
+  O do iPhone tem fundo grafite: atalho de site não acompanha o modo escuro do iOS;
 - `web/src/theme/tokens.ts`: a fonte do nome (`font.brand`) e o creme do avatar
   (`avatarFrom` e `avatarTo`), que acompanha o papel do selo;
 - `supabase/templates/acesso.html`: o topo e o botão do e-mail de acesso (em produção, colar
