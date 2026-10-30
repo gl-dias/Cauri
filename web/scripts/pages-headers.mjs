@@ -30,6 +30,16 @@ const csp = [
   "object-src 'none'",
 ].join("; ");
 
+// Rotas que devolvem o HTML do app. O no-transform impede o Cloudflare de reescrever a
+// página, o que inclui injetar o script do Web Analytics no domínio (bloqueado pela CSP de
+// qualquer jeito, mas sujando o console). Fica só no HTML: em JS e imagens não há o que
+// injetar, e o no-transform pode impedir a compressão na borda. Rota nova do app entra aqui.
+// Cada rota casa com uma regra só, para não somar dois Cache-Control na mesma resposta.
+const htmlRoutes = ["/", "/index.html", "/demo*", "/app*", "/login", "/entrar"];
+const htmlRules = htmlRoutes
+  .map((route) => `${route}\n  Cache-Control: public, max-age=0, must-revalidate, no-transform`)
+  .join("\n\n");
+
 const headers = `/*
   Content-Security-Policy: ${csp}
   X-Content-Type-Options: nosniff
@@ -37,6 +47,8 @@ const headers = `/*
   Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin
+
+${htmlRules}
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
