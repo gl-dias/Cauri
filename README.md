@@ -1,6 +1,6 @@
 # Cauri
 
-Portal de investimentos que junta ações, FIIs, ETFs, Tesouro Direto, renda fixa e cripto numa carteira só e compara a rentabilidade com o CDI.
+Carteira de investimentos que junta ações, FIIs, ETFs, Tesouro Direto, renda fixa e cripto num lugar só e compara a rentabilidade com o CDI.
 As operações entram pela planilha da corretora ou por uma frase falada ("comprei 3 petrobras"), e nada é gravado sem você conferir antes.
 
 ### [Abrir a demo ao vivo →](https://cauri.com.br/demo)

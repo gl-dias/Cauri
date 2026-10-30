@@ -3,7 +3,7 @@
 > Proposta aprovada em 29/10/2026, já com os ajustes do checkpoint de aprovação.
 > Este arquivo é a fonte da verdade da arquitetura; mudou a decisão, muda aqui primeiro.
 
-Portal de investimentos pessoal, modular, com acesso remoto, para poucos usuários
+Carteira de investimentos pessoal, modular, com acesso remoto, para poucos usuários
 convidados. Também é peça de portfólio: o repositório é público e existe um modo
 `/demo` aberto, sem login, com uma carteira fictícia.
 
