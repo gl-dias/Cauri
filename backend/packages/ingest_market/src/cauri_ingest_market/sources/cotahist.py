@@ -2,7 +2,9 @@
 
 Cada registro tem 245 caracteres. Usamos só o mercado à vista (TPMERC 010) dos códigos
 BDI 02 (lote padrão: ações e units), 08 (empresas em recuperação judicial) e 12 (fundos
-imobiliários). BDRs, ETFs e Fiagro têm códigos próprios e ficam de fora por enquanto.
+imobiliários). BDRs, ETFs e Fiagro têm códigos próprios e ficam de fora por enquanto. O
+próprio Ibovespa aparece no BDI 02 como IBOV11 (ISIN com tipo IND); índice não é ativo e
+também fica de fora.
 
 Preços vêm com duas casas implícitas e podem estar cotados por lote (FATCOT), então o
 preço unitário é ``PREULT / 100 / FATCOT``.
@@ -29,6 +31,7 @@ SPOT_MARKET = "010"
 BDI_STOCKS = "02"
 BDI_JUDICIAL_RECOVERY = "08"
 BDI_REITS = "12"
+ISIN_INDEX = "IND"  # tipo do instrumento no ISIN (posições 7 a 9): BRIBOVINDM18
 _CURRENT_YEAR_MAX_AGE_S = 6 * 3600
 _ATTEMPTS = 4
 _RETRY_WAIT_S = 5.0  # multiplicado pelo número da tentativa
@@ -53,6 +56,9 @@ def parse_line(line: str) -> CotahistQuote | None:
     bdi = line[10:12]
     if line[24:27] != SPOT_MARKET or bdi not in (BDI_STOCKS, BDI_JUDICIAL_RECOVERY, BDI_REITS):
         return None
+    isin = line[230:242].strip()
+    if isin[6:9] == ISIN_INDEX:
+        return None
     factor = int(line[210:217]) or 1
     close = Decimal(int(line[108:121])) / Decimal(100) / Decimal(factor)
     if close <= 0:
@@ -64,7 +70,7 @@ def parse_line(line: str) -> CotahistQuote | None:
         short_name=line[27:39].strip(),
         spec=" ".join(line[39:49].split()),
         close=close,
-        isin=line[230:242].strip(),
+        isin=isin,
         raw=line,
     )
 

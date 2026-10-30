@@ -24,6 +24,12 @@ HGLG11 = (
     "000000001572800000000157350000000015735000000001575623960000000000000094297000000001483161587"
     "000000000000009999123100000010000000000000BRHGLGCTF004291"
 )
+IBOV11 = (
+    "012026010702IBOV11      010IBOVESPA    IBO/         R$  "
+    "000001620820000000162082000000016208200"
+    "000001620820000000162082000000000000000000000000000000043000000000000117360000000019021943520"
+    "000000000000009999123100001000000000000000BRIBOVINDM18014"
+)
 HEADER = "00COTAHIST.2026BOVESPA 20261028".ljust(245)
 
 
@@ -50,6 +56,10 @@ class TestCotahist:
         assert cotahist.parse_line(fracionario) is None
         bdr = PETR4[:10] + "34" + PETR4[12:]
         assert cotahist.parse_line(bdr) is None
+
+    def test_ignora_o_indice_no_bdi_de_acoes(self):
+        assert IBOV11[10:12] == cotahist.BDI_STOCKS
+        assert cotahist.parse_line(IBOV11) is None
 
     def test_fator_de_cotacao_divide_o_preco(self):
         por_mil = PETR4[:210] + "0001000" + PETR4[217:]
