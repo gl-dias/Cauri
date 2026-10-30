@@ -485,8 +485,10 @@ carteira inventada, e o patrimônio do demo se mexe todo dia com o mercado.
 
 ### /app (Fase 3b)
 
-- **Login:** magic link com PKCE (`/login`). Quem não está na allowlist é recusado pelo hook
-  do Supabase Auth; a tela mostra sempre a mesma mensagem ("se o seu e-mail estiver na lista
+- **Login:** magic link (`/login`). O e-mail leva a `/entrar?token_hash=...`, e a sessão nasce
+  do `verifyOtp` no clique de "Entrar": vale em qualquer aparelho e não é gasta por filtros de
+  e-mail que pré-abrem links (template em `supabase/templates/acesso.html`). Quem não está
+  na allowlist é recusado pelo hook do Supabase Auth; a tela mostra sempre a mesma mensagem ("se o seu e-mail estiver na lista
   de convidados..."), sem revelar nada. Sessão válida fora da allowlist cai numa tela de
   "acesso restrito".
 - **Um só cliente de sessão** para `/login` e `/app`; o `/demo` fica fora dele e nunca lê

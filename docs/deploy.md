@@ -68,11 +68,16 @@ Nginx recebe o subdomínio por `sed` na instalação.
    - Host `smtp.resend.com`, porta `465`, usuário `resend`, senha = chave da API do Resend;
    - Remetente `nao-responda@<dominio-do-email>`, nome `Cauri`.
    Em *Rate Limits*, suba "emails sent per hour" para 30.
-8. **JWT Keys** (Settings): a chave atual precisa ser assimétrica (ECC ou RSA), o padrão de
+8. **Auth, Emails, Templates:** em **Magic link** e em **Confirm signup** (o primeiro acesso
+   de um convidado usa este), assunto `Seu link de acesso ao Cauri` e, no corpo, o HTML de
+   `supabase/templates/acesso.html`. O link leva a `/entrar?token_hash=...`, e só o clique em
+   "Entrar" gasta o código. Com o template padrão, o link é gasto ao abrir (filtros de e-mail
+   que pré-abrem links derrubam o acesso) e só funciona no navegador que pediu (PKCE).
+9. **JWT Keys** (Settings): a chave atual precisa ser assimétrica (ECC ou RSA), o padrão de
    projeto novo. A API valida o login pelo JWKS público e não precisa de segredo. Se
    aparecer só *Legacy HS256*, migre para a chave nova no próprio painel.
-9. **Chave publicável** (Settings, API Keys): a `sb_publishable_...` vai para o Pages. A
-   chave secreta (service role) não é usada em lugar nenhum.
+10. **Chave publicável** (Settings, API Keys): a `sb_publishable_...` vai para o Pages. A
+    chave secreta (service role) não é usada em lugar nenhum.
 
 **O que me passar depois de criar** (nada disso é segredo): o `<ref>` (Settings, General,
 *Project ID*), o `<host-do-pooler>` (botão *Connect*, *Session pooler*) e o tipo da chave
@@ -154,7 +159,7 @@ As chaves da Anthropic e da Groq não vão para o GitHub: só existem no `api.en
 ## 6. Ordem e checkpoint
 
 1. Supabase (1.1 a 1.4, com as migrations no 1.2).
-2. Resend e SMTP do Supabase (1.5 a 1.9, 2).
+2. Resend, SMTP e templates de e-mail do Supabase (1.5 a 1.10, 2).
 3. Workflow *Preparar produção* (Run workflow, "tudo"): cadastro, ativos, carteira demo,
    admin (`ADMIN_EMAIL`) e histórico de preços.
 4. VPS (3) e o workflow *Deploy da API*.

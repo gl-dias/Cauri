@@ -250,6 +250,16 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# E-mail de acesso do Cauri (o mesmo HTML vai para os templates de produção, ver docs/deploy.md).
+# O link leva a /entrar?token_hash=..., que só gasta o código no clique de "Entrar".
+[auth.email.template.magic_link]
+subject = "Seu link de acesso ao Cauri"
+content_path = "./supabase/templates/acesso.html"
+
+[auth.email.template.confirmation]
+subject = "Seu link de acesso ao Cauri"
+content_path = "./supabase/templates/acesso.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

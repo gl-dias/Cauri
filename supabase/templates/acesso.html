@@ -1,0 +1,39 @@
+<!--
+  E-mail de acesso do Cauri: usado nos templates "Magic link" e "Confirm signup" do Supabase
+  (local: supabase/config.toml; produção: colar em Authentication, Emails, Templates).
+  O link leva a /entrar?token_hash=..., e só o clique em "Entrar" na página gasta o código:
+  filtros de e-mail que abrem links sozinhos não consomem o acesso.
+  RedirectTo é o /entrar de quem pediu o link; se o endereço não estiver na lista de Redirect
+  URLs, o Supabase usa o Site URL (/app), que encaminha para /entrar.
+-->
+<!doctype html>
+<html lang="pt-BR">
+  <body style="margin:0;padding:24px;background:#f4f1ec;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d1b19">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border-radius:16px;padding:32px">
+            <tr>
+              <td>
+                <p style="margin:0 0 20px;font-size:18px;font-weight:600">Cauri</p>
+                <p style="margin:0 0 8px;font-size:22px;font-weight:600">Seu link de acesso</p>
+                <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#4a4540">
+                  Clique no botão para entrar. O link vale por 1 hora, funciona uma vez e pode ser aberto em qualquer aparelho.
+                </p>
+                <p style="margin:0 0 24px">
+                  <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email"
+                     style="display:inline-block;background:#1d1b19;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:12px">
+                    Entrar no Cauri
+                  </a>
+                </p>
+                <p style="margin:0 0 6px;font-size:13px;color:#6b655e">Se o botão não abrir, copie este endereço no navegador:</p>
+                <p style="margin:0 0 24px;font-size:13px;word-break:break-all;color:#6b655e">{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email</p>
+                <p style="margin:0;font-size:13px;color:#6b655e">Não pediu este link? Pode ignorar este e-mail; ninguém entra sem ele.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
