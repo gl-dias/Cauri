@@ -62,7 +62,10 @@ function AppFrame() {
 /** /app: privado. Sem sessão, vai para o login. */
 export function AppLayout() {
   const { session, loading, source } = useAuth();
+  const { search } = useLocation();
   if (loading) return <Centered>{null}</Centered>;
+  // Link do e-mail que caiu no endereço padrão do Supabase (Site URL = /app): confirma em /entrar.
+  if (new URLSearchParams(search).has("token_hash")) return <Navigate to={`/entrar${search}`} replace />;
   if (!session) return <Navigate to="/login" replace />;
   return (
     <SourceProvider source={source}>

@@ -15,7 +15,7 @@ for (const screen of SCREENS) {
     await openScreen(page, screen);
     await page.screenshot({ path: path.join(OUT, `${screen.name}-${info.project.name}-dobra.png`) });
     // Página inteira: a janela cresce até a altura do conteúdo para a foto fixa cobrir tudo.
-    if (!screen.name.includes("novo-lancamento") && screen.name !== "login") {
+    if (!screen.name.includes("novo-lancamento") && !screen.name.startsWith("login")) {
       const viewport = page.viewportSize()!;
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
       await page.setViewportSize({ width: viewport.width, height });

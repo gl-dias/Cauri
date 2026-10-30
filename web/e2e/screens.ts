@@ -27,6 +27,7 @@ export const SCREENS: Screen[] = [
   },
   { name: "demo-lancamentos", path: "/demo/lancamentos", ready: "movimentações", setup: mockDemo },
   { name: "login", path: "/login", ready: "Enviar link de acesso", setup: mockLogin },
+  { name: "login-confirmar", path: "/entrar?token_hash=teste&type=email", ready: "Entrar no Cauri", setup: mockLogin },
   { name: "app-inicio", path: "/app", ready: "Patrimônio total", setup: (page) => mockApp(page) },
   { name: "app-carteira", path: "/app/carteira", ready: "Posição no fechamento", setup: (page) => mockApp(page) },
   { name: "app-lancamentos", path: "/app/lancamentos", ready: "Novo lançamento", setup: (page) => mockApp(page) },

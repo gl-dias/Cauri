@@ -9,6 +9,7 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider } from "react-rou
 import { AuthProvider } from "./auth/AuthProvider";
 import { AppLayout } from "./routes/AppLayout";
 import { DemoLayout } from "./routes/DemoLayout";
+import { ConfirmLoginPage } from "./routes/ConfirmLoginPage";
 import { LoginPage } from "./routes/LoginPage";
 import { applyTheme } from "./theme/tokens";
 
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { path: "/login", element: <LoginPage /> },
+      { path: "/entrar", element: <ConfirmLoginPage /> },
       {
         path: "/app",
         element: <AppLayout />,

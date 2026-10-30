@@ -1,6 +1,9 @@
 /**
- * Sessão do /app: magic link com PKCE. Cadastro aberto é barrado no banco (hook de
- * allowlist), então a tela de login nunca revela se o e-mail está ou não autorizado.
+ * Sessão do /app por magic link. O e-mail leva a /entrar?token_hash=... (templates em
+ * supabase/templates/), e a sessão nasce do verifyOtp no clique de "Entrar": vale em qualquer
+ * navegador, ao contrário do código PKCE, que só funciona onde o link foi pedido. Cadastro
+ * aberto é barrado no banco (hook de allowlist), então a tela de login nunca revela se o
+ * e-mail está ou não autorizado.
  */
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -14,6 +17,8 @@ type AuthState = {
   loading: boolean;
   source: AppSource;
   sendMagicLink(email: string): Promise<void>;
+  /** Troca o código do link pela sessão. Falso se o link expirou ou já foi usado. */
+  confirmMagicLink(tokenHash: string): Promise<boolean>;
   signOut(): Promise<void>;
 };
 
@@ -65,11 +70,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // usuário vê o mesmo texto. Erros só de rede/limite aparecem.
         const { error } = await client.auth.signInWithOtp({
           email: email.trim().toLowerCase(),
-          options: { emailRedirectTo: `${window.location.origin}/app`, shouldCreateUser: true },
+          options: { emailRedirectTo: `${window.location.origin}/entrar`, shouldCreateUser: true },
         });
         if (error && (error.status === 429 || error.status === 0 || error.status === undefined)) {
           throw new Error("Não foi possível enviar agora. Tente de novo em alguns minutos.");
         }
+      },
+      async confirmMagicLink(tokenHash) {
+        const { error } = await client.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+        return !error;
       },
       async signOut() {
         await client.auth.signOut();

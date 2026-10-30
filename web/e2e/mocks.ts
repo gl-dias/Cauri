@@ -149,7 +149,10 @@ const RECENT_IMPORTS = [
 ];
 
 /** /app: sessão de uma convidada fictícia (admin), carteira = fixtures do demo, API simulada. */
-export async function mockApp(page: Page, { role = "admin" as "admin" | "user" } = {}): Promise<void> {
+export async function mockApp(
+  page: Page,
+  { role = "admin" as "admin" | "user", signedIn = true } = {},
+): Promise<void> {
   if (LIVE) return;
   const token = fakeJwt();
   const session = {
@@ -160,12 +163,15 @@ export async function mockApp(page: Page, { role = "admin" as "admin" | "user" }
     expires_at: Math.floor(Date.now() / 1000) + 86400,
     user: APP_USER,
   };
-  await page.addInitScript((value) => window.localStorage.setItem("cauri-app", value), JSON.stringify(session));
+  // Sem signedIn, a sessão só existe depois do verifyOtp de /entrar (respondido abaixo).
+  if (signedIn) {
+    await page.addInitScript((value) => window.localStorage.setItem("cauri-app", value), JSON.stringify(session));
+  }
 
   await page.route(/\/auth\/v1\//, async (route) => {
     const url = route.request().url();
     if (url.includes("/user")) return route.fulfill({ json: APP_USER });
-    if (url.includes("/token")) return route.fulfill({ json: session });
+    if (url.includes("/token") || url.includes("/verify")) return route.fulfill({ json: session });
     if (url.includes("/logout")) return route.fulfill({ status: 204, body: "" });
     return route.fulfill({ json: {} });
   });

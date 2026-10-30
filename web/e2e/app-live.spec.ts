@@ -28,7 +28,8 @@ async function magicLink(address: string, since: number): Promise<string> {
     if (latest) {
       const res = await fetch(`${MAILPIT}/message/${latest.ID}`);
       const msg = (await res.json()) as { HTML: string; Text: string };
-      const match = `${msg.HTML} ${msg.Text}`.match(/https?:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/);
+      // O template leva a /entrar?token_hash=... (supabase/templates/acesso.html).
+      const match = `${msg.HTML} ${msg.Text}`.match(/https?:\/\/[^\s"'<>]+\/entrar\?token_hash=[^\s"'<>]+/);
       if (match) return match[0].replace(/&amp;/g, "&");
     }
     await new Promise((r) => setTimeout(r, 500));
@@ -43,12 +44,12 @@ async function requestLink(page: Page, address: string) {
   await expect(page.getByText("Confira seu e-mail")).toBeVisible();
 }
 
-/** Entra pelo magic link e espera a sessão de verdade (o app troca o código do link pela
- * sessão depois de carregar; navegar antes disso cai no login). */
+/** Entra pelo link do e-mail: a página /entrar só gasta o código no clique de "Entrar". */
 async function login(page: Page) {
   const since = Date.now() - 1000;
   await requestLink(page, ADMIN);
   await page.goto(await magicLink(ADMIN, since));
+  await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/app/);
   await expect(page.getByRole("link", { name: "Admin" }).first()).toBeVisible();
 }

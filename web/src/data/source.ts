@@ -75,7 +75,7 @@ export function createDemoClient(): MartsClient {
   });
 }
 
-/** Cliente do /app: sessão do magic link (PKCE) guardada no navegador. */
+/** Cliente do /app: sessão do magic link (verifyOtp em /entrar) guardada no navegador. */
 export function createAppClient(): MartsClient {
   return createClient<any, "marts">(env("VITE_SUPABASE_URL"), env("VITE_SUPABASE_PUBLISHABLE_KEY"), {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce", storageKey: "cauri-app" },
