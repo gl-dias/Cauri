@@ -33,6 +33,8 @@ Para trocar de logo, mudar estes lugares juntos:
 - `web/src/ui/Brand.tsx`: o ícone e o nome na barra do app e nas telas de acesso;
 - `web/public/favicon.svg`: a aba do navegador (versão simplificada, sem o anel e os dentes,
   para ler bem em 16 e 32 px);
+- `web/public/apple-touch-icon.png` e `icon-*.png`: o ícone da tela de início do celular
+  (o iPhone não usa o SVG), gerados de `09-selo.svg` por `node scripts/icons.mjs` em `web/`;
 - `web/src/theme/tokens.ts`: a fonte do nome (`font.brand`) e o creme do avatar
   (`avatarFrom` e `avatarTo`), que acompanha o papel do selo;
 - `supabase/templates/acesso.html`: o topo e o botão do e-mail de acesso (em produção, colar
